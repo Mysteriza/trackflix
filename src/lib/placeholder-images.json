@@ -1,0 +1,46 @@
+{
+  "placeholderImages": [
+    {
+      "id": "movie1",
+      "description": "A placeholder image for a sci-fi movie.",
+      "imageUrl": "https://picsum.photos/seed/m1/300/450",
+      "imageHint": "space movie"
+    },
+    {
+      "id": "movie2",
+      "description": "A placeholder image for a drama movie.",
+      "imageUrl": "https://picsum.photos/seed/m2/300/450",
+      "imageHint": "dramatic film"
+    },
+    {
+      "id": "movie3",
+      "description": "A placeholder image for an action movie.",
+      "imageUrl": "https://picsum.photos/seed/m3/300/450",
+      "imageHint": "action explosion"
+    },
+    {
+      "id": "movie4",
+      "description": "A placeholder image for a comedy movie.",
+      "imageUrl": "https://picsum.photos/seed/m4/300/450",
+      "imageHint": "funny comedy"
+    },
+    {
+      "id": "series1",
+      "description": "A placeholder image for a fantasy series.",
+      "imageUrl": "https://picsum.photos/seed/s1/300/450",
+      "imageHint": "fantasy world"
+    },
+    {
+      "id": "series2",
+      "description": "A placeholder image for a crime series.",
+      "imageUrl": "https://picsum.photos/seed/s2/300/450",
+      "imageHint": "crime detective"
+    },
+    {
+      "id": "series3",
+      _description: "A placeholder image for a historical series.",
+      "imageUrl": "https://picsum.photos/seed/s3/300/450",
+      "imageHint": "historical drama"
+    }
+  ]
+}
