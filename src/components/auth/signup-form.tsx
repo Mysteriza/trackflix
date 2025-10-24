@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -6,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc } from "firebase/firestore"; 
+import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from '@/lib/firebase';
 import { useState, useEffect, useRef } from 'react';
 
@@ -33,7 +32,6 @@ import { useToast } from '@/hooks/use-toast';
 import { AnimatedCharacter } from './animated-character';
 import { cn } from '@/lib/utils';
 
-
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Please enter a valid email.' }),
@@ -44,6 +42,7 @@ export function SignupForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [focusState, setFocusState] = useState<'idle' | 'tracking' | 'peeking'>('idle');
+  const [showPassword, setShowPassword] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -72,18 +71,16 @@ export function SignupForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Update Firebase Auth profile
       await updateProfile(user, {
         displayName: values.name,
       });
 
-      // Create user document in Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: values.name,
         displayName_lowercase: values.name.toLowerCase(),
         email: values.email,
-        watchlistVisibility: 'public', // Default to public
+        watchlistVisibility: 'public',
         createdAt: Date.now(),
         photoURL: user.photoURL,
       });
@@ -132,9 +129,9 @@ export function SignupForm() {
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Your Name" 
-                      {...field} 
+                    <Input
+                      placeholder="Your Name"
+                      {...field}
                       onFocus={() => setFocusState('tracking')}
                     />
                   </FormControl>
@@ -149,9 +146,9 @@ export function SignupForm() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="name@example.com" 
-                      {...field} 
+                    <Input
+                      placeholder="name@example.com"
+                      {...field}
                       onFocus={() => setFocusState('tracking')}
                     />
                   </FormControl>
@@ -165,14 +162,33 @@ export function SignupForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
-                  <FormControl>
+                  <div className="relative">
+                    <FormControl>
                       <Input
-                        type='password'
+                        type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
                         {...field}
                         onFocus={() => setFocusState('peeking')}
+                        className="pr-10" // Add padding for the icon
                       />
                     </FormControl>
+                     <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">
+                        {showPassword ? 'Hide password' : 'Show password'}
+                      </span>
+                    </Button>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
