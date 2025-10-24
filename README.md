@@ -2,6 +2,17 @@
 
 Welcome to TrackFlix, your personal application for managing and tracking movies and TV series. Keep a record of what you want to watch, what you've already seen, and optionally share your public watchlist with others. This application is built using Next.js, Firebase, and Tailwind CSS.
 
+## Screenshots
+### Movies
+<img width="1920" height="1356" alt="screencapture-trackflix-movie-netlify-app-dashboard-2025-10-22-06_13_32" src="https://github.com/user-attachments/assets/a6182f1a-095d-4444-b649-bb112fda261b" />
+
+### TV Shows
+<img width="1920" height="1055" alt="screencapture-trackflix-movie-netlify-app-dashboard-2025-10-22-06_13_53" src="https://github.com/user-attachments/assets/756a5884-6628-47d9-909f-221f2423c7e0" />
+
+### Watched List / History
+<img width="1920" height="2428" alt="screencapture-trackflix-movie-netlify-app-dashboard-2025-10-22-06_14_06" src="https://github.com/user-attachments/assets/35749bf6-5a37-4a90-8c1b-a8e79adefea3" />
+
+
 ## ✨ Features
 
 **Watchlist Management:**
