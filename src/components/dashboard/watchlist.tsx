@@ -22,7 +22,7 @@ import { WatchedItemCard } from './watched-item-card';
 import { AddItemDialog } from './add-item-dialog';
 import { AddFolderDialog } from './add-folder-dialog';
 import { QuickAddDialog } from './quick-add-dialog';
-import type { WatchlistItem, WatchlistFolder, QuickAddItem } from '@/lib/types';
+import type { WatchlistItem, WatchlistFolder, QuickAddItem, WatchlistItemType } from '@/lib/types'; // Pastikan WatchlistItemType diimpor
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -41,12 +41,15 @@ import { Label } from '../ui/label';
 import { Card, CardContent } from '../ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { FolderMenu } from './folder-menu';
-import { Badge } from "@/components/ui/badge";
+// Hapus import Badge karena tidak digunakan lagi untuk filter
+// import { Badge } from "@/components/ui/badge";
 
 const chunk = <T,>(arr: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
     arr.slice(i * size, i * size + size)
   );
+
+type WatchedFilterType = 'all' | 'movie' | 'series'; // Tipe untuk state filter
 
 export function Watchlist() {
   const [user, loading] = useAuthState(auth);
@@ -62,6 +65,7 @@ export function Watchlist() {
 
   const [watchedSearchTerm, setWatchedSearchTerm] = useState('');
   const [watchedSort, setWatchedSort] = useState('watchedAt_desc');
+  const [watchedTypeFilter, setWatchedTypeFilter] = useState<WatchedFilterType>('all'); // State baru untuk filter watched
 
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [columns, setColumns] = useState(5);
@@ -98,9 +102,15 @@ export function Watchlist() {
   const unwatchedMovies = useMemo(() => items.filter(item => item.type === 'movie' && !item.watched).sort((a, b) => a.order - b.order), [items]);
   const unwatchedSeries = useMemo(() => items.filter(item => item.type === 'series' && !item.watched).sort((a, b) => a.order - b.order), [items]);
 
+  // Modifikasi useMemo untuk watchedItems agar memasukkan filter
   const watchedItems = useMemo(() => {
     const allWatched = items.filter(item => item.watched);
-    return allWatched.sort((a, b) => {
+
+    const filteredByType = watchedTypeFilter === 'all'
+      ? allWatched
+      : allWatched.filter(item => item.type === watchedTypeFilter);
+
+    return filteredByType.sort((a, b) => {
       switch (watchedSort) {
         case 'watchedAt_asc':
           return (a.watchedAt || 0) - (b.watchedAt || 0);
@@ -113,23 +123,30 @@ export function Watchlist() {
           return (b.watchedAt || 0) - (a.watchedAt || 0);
       }
     });
-  }, [items, watchedSort]);
+  }, [items, watchedSort, watchedTypeFilter]); // Tambahkan watchedTypeFilter sebagai dependency
 
+  // searchedWatchedResults akan otomatis terupdate karena bergantung pada watchedItems
   const searchedWatchedResults = useMemo(() => {
     if (!watchedSearchTerm) {
       return { searchedFolders: [], searchedItems: watchedItems, isSearching: false };
     }
     const lowercasedTerm = watchedSearchTerm.toLowerCase();
-    const searchedFolders = folders.filter(folder => folder.name.toLowerCase().includes(lowercasedTerm));
+
+    // Filter folder berdasarkan nama
+    const searchedFolders = folders.filter(folder =>
+      folder.name.toLowerCase().includes(lowercasedTerm) &&
+      items.some(item => item.folderId === folder.id && item.watched && (watchedTypeFilter === 'all' || item.type === watchedTypeFilter))
+    );
     const searchedFolderIds = new Set(searchedFolders.map(f => f.id));
 
+    // Filter item standalone berdasarkan judul
     const searchedItems = watchedItems.filter(item =>
       item.title.toLowerCase().includes(lowercasedTerm) &&
-      (!item.folderId || !searchedFolderIds.has(item.folderId))
+      (!item.folderId || !searchedFolderIds.has(item.folderId)) // Hanya item standalone
     );
 
     return { searchedFolders, searchedItems, isSearching: true };
-  }, [watchedSearchTerm, watchedItems, folders]);
+  }, [watchedSearchTerm, watchedItems, folders, watchedTypeFilter]); // Tambahkan watchedTypeFilter
 
   useEffect(() => {
     if (user) {
@@ -184,6 +201,8 @@ export function Watchlist() {
     setUnwatchedCurrentPage(1);
     setSelectedItemIds([]);
     setOpenFolderId(null);
+    setWatchedTypeFilter('all'); // Reset filter watched saat ganti tab
+    setWatchedSearchTerm(''); // Reset search term saat ganti tab
   }, [activeTab, unwatchedItemsPerPage]);
 
   useEffect(() => {
@@ -191,11 +210,11 @@ export function Watchlist() {
     if (!watchedSearchTerm) {
       setOpenFolderId(null);
     }
-  }, [activeTab, foldersPerPage, watchedSearchTerm]);
+  }, [activeTab, foldersPerPage, watchedSearchTerm, watchedTypeFilter]); // Tambahkan watchedTypeFilter
 
   useEffect(() => {
-    setWatchedCurrentPage(1);
-  }, [watchedSearchTerm, watchedSort, watchedItemsPerPage]);
+    setWatchedCurrentPage(1); // Reset halaman saat filter, sort, atau search berubah
+  }, [watchedSearchTerm, watchedSort, watchedItemsPerPage, watchedTypeFilter]); // Tambahkan watchedTypeFilter
 
   const getCategorizedItems = useCallback((list: WatchlistItem[]) => {
     const itemsByFolder = folders.reduce((acc, folder) => {
@@ -206,7 +225,7 @@ export function Watchlist() {
     const standaloneItems: WatchlistItem[] = [];
 
     list.forEach(item => {
-      if (item.folderId && itemsByFolder[item.folderId]) {
+      if (item.folderId && itemsByFolder[item.folderId] !== undefined) { // Cek apakah folderId valid
         itemsByFolder[item.folderId].push(item);
       } else {
         standaloneItems.push(item);
@@ -216,6 +235,7 @@ export function Watchlist() {
     return { standalone: standaloneItems, byFolder: itemsByFolder };
   }, [folders]);
 
+  // visibleFolders untuk tab watched perlu mempertimbangkan filter tipe
   const visibleFolders = useMemo(() => {
     const list = activeTab === 'watched' ? watchedItems : (activeTab === 'movies' ? unwatchedMovies : unwatchedSeries);
     const { byFolder } = getCategorizedItems(list);
@@ -224,12 +244,18 @@ export function Watchlist() {
     return folders.filter(folder => {
         const folderItems = byFolder[folder.id] || [];
         if (folderItems.length === 0) return false;
+
         if (activeTab === 'watched') {
-            return folderItems.every(item => item.watched);
+            // Apply watched type filter to folder items
+            const filteredFolderItems = watchedTypeFilter === 'all'
+                ? folderItems
+                : folderItems.filter(item => item.type === watchedTypeFilter);
+            return filteredFolderItems.length > 0 && filteredFolderItems.every(item => item.watched);
         }
+        // Logic for unwatched tabs remains the same
         return folderItems.every(item => item.type === currentTabType && !item.watched);
     });
-  }, [activeTab, watchedItems, unwatchedMovies, unwatchedSeries, folders, getCategorizedItems]);
+  }, [activeTab, watchedItems, unwatchedMovies, unwatchedSeries, folders, getCategorizedItems, watchedTypeFilter]); // Tambahkan watchedTypeFilter
 
   useEffect(() => {
     if (openFolderId && !searchedWatchedResults.isSearching) {
@@ -243,6 +269,8 @@ export function Watchlist() {
     }
   }, [folderCurrentPage, foldersPerPage, openFolderId, visibleFolders, searchedWatchedResults.isSearching]);
 
+
+  // ... (fungsi handleUpdateItem, handleUpdateWatched, handleAddItem, handleQuickAdd, handleAddFolder, handleEditFolder, handleDeleteFolder, handleDeleteItem, handleBulkDelete, handleDeleteAllWatched, handleExportWatched, handleImportWatched, reorderItems, handleMoveToFolder, handleMoveItem, handleDragStart, handleDragEnter, handleDragOverFolder, stopAutoScroll, cleanUpDrag, handleDragEnd, handleBulkMove, handleDragOver, handleToggleSelectItem, handleSelectAll, handleSelectAllInFolder, getIsAllStandaloneSelected, getIsAllInFolderSelected tetap sama) ...
 
   const handleUpdateItem = async (id: string, updates: Partial<Omit<WatchlistItem, 'id'>>) => {
     if (!user) return;
@@ -267,6 +295,10 @@ export function Watchlist() {
       if (item.rating === undefined || item.rating === null) {
           updates.rating = null;
       }
+    } else {
+        updates.watchedAt = null; // Hapus watchedAt jika diunwatch
+        updates.rating = undefined; // Hapus rating jika diunwatch
+        updates.notes = item.notes || ''; // Pertahankan notes
     }
     await handleUpdateItem(item.id, updates);
     toast({
@@ -297,6 +329,7 @@ export function Watchlist() {
       };
       if (!itemData.watched) {
           delete (newItem as Partial<WatchlistItem>).rating;
+          delete (newItem as Partial<WatchlistItem>).notes; // Hapus notes jika menambah ke unwatched
       }
 
       await addDoc(collection(db, 'watchlist'), newItem);
@@ -348,6 +381,7 @@ export function Watchlist() {
           createdAt: timestamp,
           watchedAt: timestamp,
           rating: null,
+          notes: '', // Initialize notes as empty string for quick add
         });
       });
 
@@ -518,7 +552,11 @@ export function Watchlist() {
     toast({ title: 'Exporting watched list...', description: 'Please wait.' });
 
     try {
-      const dataToExport = watchedItems.map(({ id, userId, ...item }) => item);
+      // Note: Menggunakan 'items' untuk mendapatkan data terbaru, lalu filter client-side
+      const dataToExport = items
+          .filter(item => item.watched)
+          .map(({ id, userId, ...item }) => item);
+
 
       const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -553,8 +591,9 @@ export function Watchlist() {
 
         toast({ title: 'Importing watched list...', description: 'Please wait, this may take a moment.' });
 
-        const existingTitles = new Set(watchedItems.map(item => item.title.toLowerCase()));
-        let maxOrder = watchedItems.length > 0 ? Math.max(...watchedItems.map(i => i.order)) : 0;
+        const currentWatchedItems = items.filter(item => item.watched);
+        const existingTitles = new Set(currentWatchedItems.map(item => item.title.toLowerCase()));
+        let maxOrder = currentWatchedItems.length > 0 ? Math.max(...currentWatchedItems.map(i => i.order)) : 0;
 
         const batch = writeBatch(db);
         let itemsAdded = 0;
@@ -748,6 +787,10 @@ export function Watchlist() {
     const isWatchedItem = draggedItem.watched;
     // Basic check: Allow dropping watched items anywhere (folder or standalone)
     if (isWatchedItem) {
+        // Also check type compatibility if a filter is active
+        if (watchedTypeFilter !== 'all' && draggedItem.type !== watchedTypeFilter) {
+            return;
+        }
         setDragOverFolderId(folderId);
         setDragOverItem(null); // Clear item drag-over state if hovering folder
         return;
@@ -794,11 +837,11 @@ export function Watchlist() {
       return;
     }
 
-    const dragTargetIsFolder = dragOverFolderId !== null && dragOverFolderId !== draggedItem.folderId;
+    const dragTargetIsFolder = dragOverFolderId !== null || (dragOverFolderId === null && draggedItem.folderId !== null); // Consider dropping to standalone as a folder move
     const dragTargetIsItem = dragOverItem !== null && dragOverItem.id !== draggedItem.id; // Ensure it's not dropped on itself
 
     // Priority: Folder drop
-    if (dragTargetIsFolder) {
+    if (dragTargetIsFolder && dragOverFolderId !== draggedItem.folderId) {
       await handleMoveToFolder(draggedItem.id, dragOverFolderId);
     }
     // Else: Item reorder drop (within the same folder/standalone context)
@@ -929,7 +972,7 @@ export function Watchlist() {
     let visibleIds: string[];
 
     if (isWatched) {
-      const { standalone } = getCategorizedItems(watchedItems);
+      const { standalone } = getCategorizedItems(watchedItems); // Gunakan watchedItems yang sudah difilter
       const paginatedWatchedItems = standalone.slice((watchedCurrentPage - 1) * watchedItemsPerPage, watchedCurrentPage * watchedItemsPerPage);
       visibleIds = paginatedWatchedItems.map(item => item.id);
     } else {
@@ -958,7 +1001,7 @@ export function Watchlist() {
   const getIsAllStandaloneSelected = () => {
     let visibleStandaloneIds: string[];
     if (activeTab === 'watched') {
-      const { standalone } = getCategorizedItems(watchedItems);
+      const { standalone } = getCategorizedItems(watchedItems); // Gunakan watchedItems yang sudah difilter
        if (standalone.length === 0) return false;
       visibleStandaloneIds = standalone
         .slice((watchedCurrentPage - 1) * watchedItemsPerPage, watchedCurrentPage * watchedItemsPerPage)
@@ -967,13 +1010,14 @@ export function Watchlist() {
       const { standalone } = getCategorizedItems(currentUnwatchedList);
        if (standalone.length === 0) return false;
       visibleStandaloneIds = standalone
-        .slice((unwatchedCurrentPage - 1) * unwatchedItemsPerPage, unwatchedItemsPerPage)
+        .slice((unwatchedCurrentPage - 1) * unwatchedItemsPerPage, unwatchedCurrentPage * unwatchedItemsPerPage) // Perbaiki logika paginasi
         .map(i => i.id);
     }
 
     if (visibleStandaloneIds.length === 0) return false;
     return visibleStandaloneIds.every(id => selectedItemIds.includes(id));
   };
+
 
   const getIsAllInFolderSelected = (folderItems: WatchlistItem[]) => {
     if (folderItems.length === 0) return false;
@@ -1059,7 +1103,7 @@ export function Watchlist() {
               <WatchedItemCard
                 item={item}
                 allFolders={allFolders}
-                items={items}
+                items={items} // Berikan semua item untuk MoveToFolderDialog
                 isDragging={!isMobile && draggedItem?.id === item.id}
                 isSelected={selectedItemIds.includes(item.id)}
                 isSelectionMode={selectedItemIds.length > 0}
@@ -1083,7 +1127,7 @@ export function Watchlist() {
                 itemsPerPage={watchedItemsPerPage}
                 onItemsPerPageChange={(value) => {
                   setWatchedItemsPerPage(value);
-                  setWatchedCurrentPage(1);
+                  setWatchedCurrentPage(1); // Reset halaman saat mengubah item per halaman
                 }}
                 itemsPerPageOptions={[25, 50, 100]}
             />
@@ -1112,6 +1156,10 @@ export function Watchlist() {
                 {row.map((folder) => {
                   const folderItems = itemsByFolder[folder.id] || [];
                   const isDropTarget = !isMobile && draggedItem && draggedItem.folderId !== folder.id && dragOverFolderId === folder.id;
+                   const filteredFolderItems = activeTab === 'watched' && watchedTypeFilter !== 'all'
+                        ? folderItems.filter(item => item.type === watchedTypeFilter)
+                        : folderItems;
+                   const displayItemCount = filteredFolderItems.length;
 
                   return (
                     <Card
@@ -1132,7 +1180,7 @@ export function Watchlist() {
                           <Folder className="h-8 w-8 text-primary shrink-0" />
                           <div className="min-w-0">
                             <p className="font-semibold text-sm sm:text-base break-words">{folder.name}</p>
-                            <p className="text-xs text-muted-foreground">{folderItems.length} items</p>
+                            <p className="text-xs text-muted-foreground">{displayItemCount} items</p>
                           </div>
                         </div>
                       </CardContent>
@@ -1197,7 +1245,7 @@ export function Watchlist() {
         return (
           <div className="text-center text-muted-foreground py-12">
             <p>Your {typeName} list is empty.</p>
-            <p>Click "Add Movie/Series" to get started.</p>
+            <p>Click "Add {typeName.charAt(0).toUpperCase() + typeName.slice(1)}" to get started.</p>
           </div>
         )
     }
@@ -1251,16 +1299,42 @@ export function Watchlist() {
     );
   }
 
+  // Modifikasi renderCategorizedWatched untuk menggunakan Button filter
   const renderCategorizedWatched = () => {
     const { searchedFolders, searchedItems, isSearching } = searchedWatchedResults;
-    const watchedMoviesCount = watchedItems.filter(item => item.type === 'movie').length;
-    const watchedSeriesCount = watchedItems.filter(item => item.type === 'series').length;
+    // Hitung statistik dari *sebelum* filter tipe diterapkan
+    const allWatchedItemsUnfiltered = items.filter(item => item.watched);
+    const watchedMoviesCount = allWatchedItemsUnfiltered.filter(item => item.type === 'movie').length;
+    const watchedSeriesCount = allWatchedItemsUnfiltered.filter(item => item.type === 'series').length;
+    const totalWatched = allWatchedItemsUnfiltered.length;
 
-    const renderCounters = () => (
+    // Fungsi render filter buttons
+    const renderFilterButtons = () => (
       <div className="flex items-center gap-2 mb-6">
-          <Badge variant="secondary">Total: {watchedItems.length}</Badge>
-          <Badge variant="secondary">Movies: {watchedMoviesCount}</Badge>
-          <Badge variant="secondary">Series: {watchedSeriesCount}</Badge>
+        <Button
+            variant={watchedTypeFilter === 'all' ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setWatchedTypeFilter('all')}
+            className="h-8 px-3"
+        >
+            Total: {totalWatched}
+        </Button>
+         <Button
+            variant={watchedTypeFilter === 'movie' ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setWatchedTypeFilter('movie')}
+            className="h-8 px-3"
+        >
+            Movies: {watchedMoviesCount}
+        </Button>
+         <Button
+            variant={watchedTypeFilter === 'series' ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setWatchedTypeFilter('series')}
+            className="h-8 px-3"
+        >
+            Series: {watchedSeriesCount}
+        </Button>
       </div>
     );
 
@@ -1268,7 +1342,12 @@ export function Watchlist() {
       const allSearchItemIds = new Set<string>();
       searchedItems.forEach(item => allSearchItemIds.add(item.id));
       searchedFolders.forEach(folder => {
-        const itemsInFolder = items.filter(item => item.folderId === folder.id);
+        // Hanya tambahkan item yang sesuai dengan filter saat ini
+        const itemsInFolder = items.filter(item =>
+            item.folderId === folder.id &&
+            item.watched &&
+            (watchedTypeFilter === 'all' || item.type === watchedTypeFilter)
+        );
         itemsInFolder.forEach(item => allSearchItemIds.add(item.id));
       });
 
@@ -1281,9 +1360,13 @@ export function Watchlist() {
 
     const getIsAllSearchResultsSelected = () => {
       const allSearchItemIds = new Set<string>();
-      searchedItems.forEach(item => allSearchItemIds.add(item.id));
+       searchedItems.forEach(item => allSearchItemIds.add(item.id));
       searchedFolders.forEach(folder => {
-        const itemsInFolder = items.filter(item => item.folderId === folder.id);
+         const itemsInFolder = items.filter(item =>
+            item.folderId === folder.id &&
+            item.watched &&
+            (watchedTypeFilter === 'all' || item.type === watchedTypeFilter)
+        );
         itemsInFolder.forEach(item => allSearchItemIds.add(item.id));
       });
       if (allSearchItemIds.size === 0) return false;
@@ -1292,10 +1375,16 @@ export function Watchlist() {
 
     if (isSearching) {
       if (searchedFolders.length === 0 && searchedItems.length === 0) {
-        return <p className="text-center text-muted-foreground py-10">No results for "{watchedSearchTerm}"</p>;
+        return (
+          <>
+            {renderFilterButtons()}
+            <p className="text-center text-muted-foreground py-10">No results for "{watchedSearchTerm}" {watchedTypeFilter !== 'all' ? ` in ${watchedTypeFilter}s` : ''}</p>
+          </>
+        );
       }
       return (
         <div className="space-y-8">
+            {renderFilterButtons()}
             <div className="flex justify-end">
                 <div className="flex items-center space-x-2">
                     <Checkbox
@@ -1310,33 +1399,41 @@ export function Watchlist() {
             <div>
               <h2 className="text-2xl font-bold mb-6">Folders ({searchedFolders.length})</h2>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {searchedFolders.map(folder => (
-                  <Card
-                    key={folder.id}
-                    onClick={() => {
-                      setOpenFolderId(prev => prev === folder.id ? null : folder.id);
-                    }}
-                    className={cn(
-                      "transition-all duration-300 cursor-pointer hover:border-primary w-full flex flex-col h-full",
-                      openFolderId === folder.id && "border-primary bg-primary/10"
-                    )}
-                  >
-                    <CardContent className="p-3 sm:p-4 flex-1 w-full flex items-center justify-between">
-                      <div className='flex items-center gap-4 text-left min-w-0'>
-                        <Folder className="h-8 w-8 text-primary shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm sm:text-base break-words">{folder.name}</p>
-                          <p className="text-xs text-muted-foreground">{items.filter(i => i.folderId === folder.id).length} items</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {searchedFolders.map(folder => {
+                   const folderItems = items.filter(i =>
+                        i.folderId === folder.id &&
+                        i.watched &&
+                        (watchedTypeFilter === 'all' || i.type === watchedTypeFilter)
+                    );
+                   if (folderItems.length === 0) return null; // Jangan render folder jika kosong setelah filter
+                  return (
+                      <Card
+                        key={folder.id}
+                        onClick={() => {
+                          setOpenFolderId(prev => prev === folder.id ? null : folder.id);
+                        }}
+                        className={cn(
+                          "transition-all duration-300 cursor-pointer hover:border-primary w-full flex flex-col h-full",
+                          openFolderId === folder.id && "border-primary bg-primary/10"
+                        )}
+                      >
+                        <CardContent className="p-3 sm:p-4 flex-1 w-full flex items-center justify-between">
+                          <div className='flex items-center gap-4 text-left min-w-0'>
+                            <Folder className="h-8 w-8 text-primary shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm sm:text-base break-words">{folder.name}</p>
+                              <p className="text-xs text-muted-foreground">{folderItems.length} items</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                })}
               </div>
               {openFolderId && searchedFolders.some(f => f.id === openFolderId) && (
                 <div className="mt-4 border rounded-lg px-4 py-6 bg-card">
                   <h3 className="text-2xl font-bold mb-6">{folders.find(f=>f.id === openFolderId)?.name}</h3>
-                  {renderWatchedList(items.filter(item => item.folderId === openFolderId), folders)}
+                  {renderWatchedList(items.filter(item => item.folderId === openFolderId && (watchedTypeFilter === 'all' || item.type === watchedTypeFilter)), folders)}
                 </div>
               )}
             </div>
@@ -1353,14 +1450,15 @@ export function Watchlist() {
       );
     }
 
-    const { standalone, byFolder } = getCategorizedItems(watchedItems);
-    const visibleFolders = folders.filter(folder => (byFolder[folder.id] || []).length > 0 && (byFolder[folder.id] || []).every(item => item.watched));
+    // Tampilan default (tidak sedang mencari)
+    const { standalone, byFolder } = getCategorizedItems(watchedItems); // watchedItems sudah difilter by type
+    const visibleFoldersFiltered = folders.filter(folder => (byFolder[folder.id] || []).length > 0); // Tampilkan folder jika ada isinya *setelah* filter tipe
 
-    if (standalone.length === 0 && visibleFolders.length === 0) {
+    if (standalone.length === 0 && visibleFoldersFiltered.length === 0) {
       return (
         <div className="text-center text-muted-foreground py-12">
-            {renderCounters()}
-            <p>Your watched list is empty.</p>
+            {renderFilterButtons()}
+            <p>Your watched list {watchedTypeFilter !== 'all' ? `for ${watchedTypeFilter}s ` : ''}is empty.</p>
         </div>
       )
     }
@@ -1373,11 +1471,11 @@ export function Watchlist() {
         onMouseUp={cleanUpDrag}
         onTouchEnd={cleanUpDrag}
       >
-        {!isSearching && renderCounters()}
-        {visibleFolders.length > 0 && (
+        {renderFilterButtons()}
+        {visibleFoldersFiltered.length > 0 && (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Folders ({visibleFolders.length})</h2>
-            <FolderGrid visibleFolders={visibleFolders} itemsByFolder={byFolder} listRenderer={renderWatchedList} />
+            <h2 className="text-2xl font-bold mb-6">Folders ({visibleFoldersFiltered.length})</h2>
+            <FolderGrid visibleFolders={visibleFoldersFiltered} itemsByFolder={byFolder} listRenderer={renderWatchedList} />
           </div>
         )}
 
@@ -1389,7 +1487,7 @@ export function Watchlist() {
             data-folder-id="standalone"
             className={cn("p-2 rounded-lg transition-all duration-300", !isMobile && draggedItem && dragOverFolderId === null && "ring-2 ring-primary ring-offset-2 ring-offset-background")}
           >
-            {(visibleFolders.length > 0) && <Separator className="my-8"/>}
+            {(visibleFoldersFiltered.length > 0) && <Separator className="my-8"/>}
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold">Standalone ({standalone.length})</h3>
                 {standalone.length > 1 ? (
@@ -1410,6 +1508,7 @@ export function Watchlist() {
       </div>
     );
   }
+
 
   const renderContent = (list: WatchlistItem[], type: 'movie' | 'series' | 'watched') => {
     if (dataLoading) {
@@ -1438,7 +1537,7 @@ export function Watchlist() {
           <TabsList className='grid w-full grid-cols-3 lg:inline-flex lg:w-auto'>
               <TabsTrigger value="movies">Movies ({unwatchedMovies.length})</TabsTrigger>
               <TabsTrigger value="series">Series ({unwatchedSeries.length})</TabsTrigger>
-              <TabsTrigger value="watched">Watched ({watchedItems.length})</TabsTrigger>
+              <TabsTrigger value="watched">Watched ({items.filter(i => i.watched).length})</TabsTrigger> {/* Tampilkan total unfiltered di sini */}
           </TabsList>
 
           <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
@@ -1510,6 +1609,7 @@ export function Watchlist() {
                                     <span>Add Folder</span>
                                 </DropdownMenuItem>
                             </AddFolderDialog>
+                             <DuplicateFinderDialog allItems={items} allFolders={folders} onDeleteItem={handleDeleteItem} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Search className="mr-2 h-4 w-4" />Find Duplicates</DropdownMenuItem>} />
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={handleExportWatched}>
                                 <Download className="mr-2 h-4 w-4" />
@@ -1564,7 +1664,7 @@ export function Watchlist() {
     <BulkActionBar
         selectedCount={selectedItemIds.length}
         folders={folders}
-        items={items}
+        items={items} // Berikan semua items
         activeTab={activeTab as 'movies' | 'series' | 'watched'}
         selectedItemIds={selectedItemIds}
         onClear={() => setSelectedItemIds([])}
