@@ -15,7 +15,7 @@ import {
   writeBatch,
   getDocs,
   Timestamp,
-  deleteField // Import deleteField
+  deleteField
 } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WatchlistItemCard } from './watchlist-item';
@@ -27,7 +27,7 @@ import type { WatchlistItem, WatchlistFolder, QuickAddItem, WatchlistItemType } 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { Folder, Search, X as ClearIcon, Trash2, Upload, Download, MoreVertical, FolderPlus, PlusCircle } from 'lucide-react';
+import { Folder, Search, X as ClearIcon, Trash2, Upload, Download, MoreVertical, FolderPlus, PlusCircle, FolderCog } from 'lucide-react'; // Import FolderCog
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from '../ui/select';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -42,6 +42,7 @@ import { Label } from '../ui/label';
 import { Card, CardContent } from '../ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { FolderMenu } from './folder-menu';
+import { ManageFoldersDialog } from './manage-folders-dialog'; // Import ManageFoldersDialog
 
 const chunk = <T,>(arr: T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
@@ -262,7 +263,7 @@ export function Watchlist() {
   }, [folderCurrentPage, foldersPerPage, openFolderId, visibleFolders, searchedWatchedResults.isSearching]);
 
 
-  const handleUpdateItem = async (id: string, updates: Partial<Omit<WatchlistItem, 'id'>> | any) => { // Cast updates to any here
+  const handleUpdateItem = async (id: string, updates: Partial<Omit<WatchlistItem, 'id'>> | any) => {
     if (!user) return;
     const itemRef = doc(db, 'watchlist', id);
     try {
@@ -289,7 +290,7 @@ export function Watchlist() {
     } else {
         updates.watchedAt = null;
         updates.notes = item.notes || '';
-        (updates as any).rating = deleteField(); // Cast only this specific property
+        (updates as any).rating = deleteField();
 
         const targetList = items.filter(i =>
             !i.watched &&
@@ -301,7 +302,7 @@ export function Watchlist() {
         updates.folderId = null;
     }
 
-    await handleUpdateItem(item.id, updates); // No need to cast again here if handleUpdateItem accepts any
+    await handleUpdateItem(item.id, updates);
     toast({
         title: watched ? "Moved to Watched" : "Moved to Watchlist",
         description: `"${item.title}" has been moved.`
@@ -426,7 +427,7 @@ export function Watchlist() {
   }
 
   const handleEditFolder = async (folderId: string, newName: string) => {
-    if (!user) return;
+    if (!user) return Promise.reject("User not logged in");
     const folderRef = doc(db, 'folders', folderId);
     try {
         await updateDoc(folderRef, { name: newName });
@@ -441,15 +442,15 @@ export function Watchlist() {
             title: "Rename Failed",
             description: "Could not rename the folder.",
         });
+        return Promise.reject(error);
     }
   };
 
   const handleDeleteFolder = async (folderId: string) => {
-    if (!user) return;
+    if (!user) return Promise.reject("User not logged in");
 
     try {
         const batch = writeBatch(db);
-
         const itemsInFolderQuery = query(collection(db, 'watchlist'), where('folderId', '==', folderId), where('userId', '==', user.uid));
         const querySnapshot = await getDocs(itemsInFolderQuery);
         querySnapshot.forEach(doc => {
@@ -463,7 +464,7 @@ export function Watchlist() {
         setOpenFolderId(null);
         toast({
             title: "Folder Deleted",
-            description: "The folder and its contents have been handled."
+            description: "The folder and its associated items have been handled."
         });
     } catch (error) {
         console.error("Error deleting folder: ", error);
@@ -472,6 +473,43 @@ export function Watchlist() {
             title: "Deletion Failed",
             description: "Could not delete the folder.",
         });
+         return Promise.reject(error);
+    }
+  };
+
+  const handleBulkDeleteFolders = async (folderIds: string[]) => {
+    if (!user || folderIds.length === 0) return Promise.reject("No folders selected or user not logged in");
+
+    try {
+      const batch = writeBatch(db);
+
+      for (const folderId of folderIds) {
+        // Move items out of the folder
+        const itemsInFolderQuery = query(collection(db, 'watchlist'), where('folderId', '==', folderId), where('userId', '==', user.uid));
+        const itemsSnapshot = await getDocs(itemsInFolderQuery);
+        itemsSnapshot.forEach(itemDoc => {
+          batch.update(itemDoc.ref, { folderId: null });
+        });
+
+        // Delete the folder itself
+        const folderRef = doc(db, 'folders', folderId);
+        batch.delete(folderRef);
+      }
+
+      await batch.commit();
+      setOpenFolderId(null); // Close any open folder detail view
+      toast({
+        title: "Folders Deleted",
+        description: `${folderIds.length} folder(s) deleted successfully. Items inside were moved to standalone.`,
+      });
+    } catch (error) {
+      console.error("Error bulk deleting folders:", error);
+      toast({
+        variant: "destructive",
+        title: "Bulk Deletion Failed",
+        description: "Could not delete the selected folders.",
+      });
+       return Promise.reject(error);
     }
   };
 
@@ -996,6 +1034,14 @@ export function Watchlist() {
     if (folderItems.length === 0) return false;
     return folderItems.every(item => selectedItemIds.includes(item.id));
   };
+
+  const itemsCountMap = useMemo(() => {
+    return folders.reduce((acc, folder) => {
+      acc[folder.id] = items.filter(item => item.folderId === folder.id).length;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [folders, items]);
+
 
   const renderUnwatchedList = (list: WatchlistItem[], isPaginated = true) => {
     if (list.length === 0) {
@@ -1595,6 +1641,19 @@ export function Watchlist() {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                         <ManageFoldersDialog
+                            allFolders={folders}
+                            itemsCountMap={itemsCountMap}
+                            onEditFolder={handleEditFolder}
+                            onDeleteFolder={handleDeleteFolder}
+                            onBulkDeleteFolders={handleBulkDeleteFolders}
+                            trigger={
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <FolderCog className="mr-2 h-4 w-4" />
+                                    <span>Manage Folders</span>
+                                </DropdownMenuItem>
+                            }
+                        />
                         <div className={cn(activeTab !== 'watched' ? 'flex flex-col' : 'hidden')}>
                           <DuplicateFinderDialog allItems={items} allFolders={folders} onDeleteItem={handleDeleteItem} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Search className="mr-2 h-4 w-4" />Find Duplicates</DropdownMenuItem>} />
                         </div>
