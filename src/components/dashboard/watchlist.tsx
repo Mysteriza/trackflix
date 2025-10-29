@@ -14,7 +14,8 @@ import {
   deleteDoc,
   writeBatch,
   getDocs,
-  Timestamp
+  Timestamp,
+  deleteField // Import deleteField
 } from 'firebase/firestore';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { WatchlistItemCard } from './watchlist-item';
@@ -261,7 +262,7 @@ export function Watchlist() {
   }, [folderCurrentPage, foldersPerPage, openFolderId, visibleFolders, searchedWatchedResults.isSearching]);
 
 
-  const handleUpdateItem = async (id: string, updates: Partial<Omit<WatchlistItem, 'id'>>) => {
+  const handleUpdateItem = async (id: string, updates: Partial<Omit<WatchlistItem, 'id'>> | any) => { // Cast updates to any here
     if (!user) return;
     const itemRef = doc(db, 'watchlist', id);
     try {
@@ -279,6 +280,7 @@ export function Watchlist() {
   const handleUpdateWatched = async (item: WatchlistItem, watched: boolean) => {
     if (!user) return;
     const updates: Partial<WatchlistItem> = { watched };
+
     if (watched) {
       updates.watchedAt = Date.now();
       if (item.rating === undefined || item.rating === null) {
@@ -286,10 +288,20 @@ export function Watchlist() {
       }
     } else {
         updates.watchedAt = null;
-        updates.rating = undefined;
         updates.notes = item.notes || '';
+        (updates as any).rating = deleteField(); // Cast only this specific property
+
+        const targetList = items.filter(i =>
+            !i.watched &&
+            i.type === item.type &&
+            i.folderId === null
+        );
+        const maxOrder = targetList.length > 0 ? Math.max(...targetList.map(i => i.order)) : 0;
+        updates.order = maxOrder + 1;
+        updates.folderId = null;
     }
-    await handleUpdateItem(item.id, updates);
+
+    await handleUpdateItem(item.id, updates); // No need to cast again here if handleUpdateItem accepts any
     toast({
         title: watched ? "Moved to Watched" : "Moved to Watchlist",
         description: `"${item.title}" has been moved.`
