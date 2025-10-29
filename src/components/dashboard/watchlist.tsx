@@ -668,10 +668,8 @@ export function Watchlist() {
         const batch = writeBatch(db);
         const itemRef = doc(db, 'watchlist', itemId);
 
-        // Update item's folderId
         batch.update(itemRef, { folderId: targetFolderId });
 
-        // Reorder source list (items left behind)
         const sourceList = items
             .filter(i => i.folderId === originalFolderId && i.id !== itemId && i.watched === itemToMove.watched && (itemToMove.watched || i.type === itemToMove.type))
             .sort((a, b) => a.order - b.order);
@@ -683,7 +681,6 @@ export function Watchlist() {
             }
         });
 
-        // Add to destination list (append to the end if unwatched)
         if (!itemToMove.watched) {
             const destinationList = items
                 .filter(i => i.folderId === targetFolderId && i.type === itemToMove.type && !i.watched)
@@ -691,7 +688,7 @@ export function Watchlist() {
             const newOrderInDestination = destinationList.length + 1;
             batch.update(itemRef, { order: newOrderInDestination });
         } else {
-             batch.update(itemRef, { order: itemToMove.order }); // Keep original order for watched, although it doesn't visually matter much
+             batch.update(itemRef, { order: itemToMove.order });
         }
 
 
@@ -1133,14 +1130,14 @@ export function Watchlist() {
                       onDragLeave={() => setDragOverFolderId(null)}
                       onDrop={handleDragEnd}
                       className={cn(
-                        "transition-all duration-300 w-full flex flex-col h-full", // Removed cursor-pointer from Card itself
+                        "transition-all duration-300 w-full flex flex-col h-full",
                         isDropTarget && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                         openFolderId === folder.id && "border-primary bg-primary/10"
                       )}
                     >
                        <CardContent className="p-3 sm:p-4 flex-1 w-full flex items-center justify-between gap-2">
                           <div
-                              className='flex items-center gap-4 text-left min-w-0 flex-1 cursor-pointer hover:opacity-80' // Added cursor-pointer here
+                              className='flex items-center gap-4 text-left min-w-0 flex-1 cursor-pointer hover:opacity-80'
                               onClick={() => setOpenFolderId(prev => prev === folder.id ? null : folder.id)}
                             >
                             <Folder className="h-8 w-8 text-primary shrink-0" />
@@ -1148,14 +1145,6 @@ export function Watchlist() {
                               <p className="font-semibold text-sm sm:text-base break-words">{folder.name}</p>
                               <p className="text-xs text-muted-foreground">{displayItemCount} items</p>
                             </div>
-                          </div>
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <FolderMenu
-                              folder={folder}
-                              allFolders={folders}
-                              onEdit={handleEditFolder}
-                              onDelete={handleDeleteFolder}
-                            />
                           </div>
                       </CardContent>
                     </Card>
@@ -1355,7 +1344,7 @@ export function Watchlist() {
       return (
         <div className="space-y-8">
             {renderFilterButtons()}
-            {(searchedFolders.length > 0 || searchedItems.length > 0) && ( // Tampilkan Select All jika ada hasil
+            {(searchedFolders.length > 0 || searchedItems.length > 0) && (
               <div className="flex justify-end">
                   <div className="flex items-center space-x-2">
                       <Checkbox
@@ -1397,14 +1386,6 @@ export function Watchlist() {
                                 <p className="text-xs text-muted-foreground">{folderItems.length} items</p>
                               </div>
                            </div>
-                            <div onClick={(e) => e.stopPropagation()}>
-                              <FolderMenu
-                                folder={folder}
-                                allFolders={folders}
-                                onEdit={handleEditFolder}
-                                onDelete={handleDeleteFolder}
-                              />
-                            </div>
                         </CardContent>
                       </Card>
                     );
