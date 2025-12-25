@@ -90,7 +90,7 @@ export function WatchlistItemCard({
   const [episode, setEpisode] = useState<string>((item.episode ?? '').toString());
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  const isNoteLong = useMemo(() => (item.notes?.length || 0) > 20, [item.notes]);
+  const isNoteLong = useMemo(() => (item.notes?.length || 0) > 40, [item.notes]);
   const [isNoteOpen, setIsNoteOpen] = useState(false);
 
   useEffect(() => {
@@ -186,7 +186,7 @@ export function WatchlistItemCard({
                   {isNoteLong && !isNoteOpen && (
                     <CollapsibleTrigger asChild>
                       <p className="text-xs text-muted-foreground italic cursor-pointer">
-                        "{item.notes.substring(0, 20)}..." <span className="underline">(more)</span>
+                        "{item.notes.substring(0, 40)}..." <span className="underline">(more)</span>
                       </p>
                     </CollapsibleTrigger>
                   )}

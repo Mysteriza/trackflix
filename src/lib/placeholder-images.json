@@ -38,7 +38,7 @@
     },
     {
       "id": "series3",
-      _description: "A placeholder image for a historical series.",
+      "description": "A placeholder image for a historical series.",
       "imageUrl": "https://picsum.photos/seed/s3/300/450",
       "imageHint": "historical drama"
     }
