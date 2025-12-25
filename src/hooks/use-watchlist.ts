@@ -304,7 +304,6 @@ export function useWatchlist() {
       };
       if (!itemData.watched) {
           delete (newItem as Partial<WatchlistItem>).rating;
-          delete (newItem as Partial<WatchlistItem>).notes;
       }
 
       await addDoc(collection(db, 'watchlist'), newItem);
