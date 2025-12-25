@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { Folder, Edit, Trash2, Loader2, FolderCog, X } from 'lucide-react';
 import { WatchlistFolder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, formatFolderName } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -81,7 +81,7 @@ export function ManageFoldersDialog({
 
   useEffect(() => {
     if (folderToEdit) {
-      editForm.reset({ name: folderToEdit.name });
+      editForm.reset({ name: formatFolderName(folderToEdit.name) });
     }
   }, [folderToEdit, editForm]);
 
@@ -236,7 +236,7 @@ export function ManageFoldersDialog({
                           />
                           <Folder className="h-5 w-5 text-primary shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{folder.name}</p>
+                            <p className="font-medium truncate">{formatFolderName(folder.name)}</p>
                             <p className="text-xs text-muted-foreground">{itemCount} item{itemCount !== 1 ? 's' : ''}</p>
                           </div>
                         </div>
@@ -281,7 +281,7 @@ export function ManageFoldersDialog({
           <DialogHeader>
             <DialogTitle>Rename Folder</DialogTitle>
             <DialogDescription>
-              Enter a new name for the "{folderToEdit?.name}" folder.
+              Enter a new name for the "{formatFolderName(folderToEdit?.name || '')}" folder.
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
@@ -301,7 +301,7 @@ export function ManageFoldersDialog({
               />
               <DialogFooter>
                 <Button variant="outline" type="button" onClick={() => setIsEditDialogOpen(false)} disabled={isProcessing}>Cancel</Button>
-                <Button type="submit" disabled={isProcessing || !editForm.formState.isValid || editForm.getValues("name") === folderToEdit?.name}>
+                <Button type="submit" disabled={isProcessing || !editForm.formState.isValid || editForm.getValues("name") === formatFolderName(folderToEdit?.name || '')}>
                   {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Changes
                 </Button>
@@ -315,7 +315,7 @@ export function ManageFoldersDialog({
        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{folderToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>Delete "{formatFolderName(folderToDelete?.name || '')}"?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure? Items inside will be moved to your standalone list. This action cannot be undone.
             </AlertDialogDescription>

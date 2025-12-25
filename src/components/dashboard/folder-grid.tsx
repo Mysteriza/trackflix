@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FolderMenu } from './folder-menu';
 import { PaginationControls } from './pagination-controls';
-import { cn, chunk } from '@/lib/utils';
+import { cn, chunk, formatFolderName } from '@/lib/utils';
 import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { JSX } from 'react';
@@ -108,7 +108,7 @@ export function FolderGrid({
                       <div className='flex items-center gap-4 text-left min-w-0 flex-1'>
                         <Folder className="h-8 w-8 text-primary shrink-0" />
                         <div className="min-w-0">
-                          <p className="font-semibold text-sm sm:text-base break-words">{folder.name}</p>
+                          <p className="font-semibold text-sm sm:text-base break-words">{formatFolderName(folder.name)}</p>
                           <p className="text-xs text-muted-foreground">{displayItemCount} items</p>
                         </div>
                       </div>
@@ -121,7 +121,7 @@ export function FolderGrid({
               <div className="mt-4 border rounded-lg px-4 py-6 bg-card">
                 <div className="flex justify-between items-center mb-6">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-2xl font-bold">{openFolderDetails.folder?.name}</h3>
+                    <h3 className="text-2xl font-bold">{formatFolderName(openFolderDetails.folder?.name || '')}</h3>
                     {openFolderDetails.folder && (
                       <FolderMenu 
                         folder={openFolderDetails.folder} 

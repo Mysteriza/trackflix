@@ -378,8 +378,13 @@ export function useWatchlist() {
       if(!user) return;
       try {
         const maxOrder = folders.length > 0 ? Math.max(...folders.map(f => f.order)) : 0;
+        let finalName = folderName.trim();
+        if (activeTab === 'watched' && !finalName.startsWith('Watched ')) {
+            finalName = `Watched ${finalName}`;
+        }
+
         await addDoc(collection(db, 'folders'), {
-            name: folderName,
+            name: finalName,
             userId: user.uid,
             order: maxOrder + 1,
             createdAt: Date.now(),
@@ -402,7 +407,12 @@ export function useWatchlist() {
     if (!user) return Promise.reject("User not logged in");
     const folderRef = doc(db, 'folders', folderId);
     try {
-        await updateDoc(folderRef, { name: newName });
+        const folder = folders.find(f => f.id === folderId);
+        let finalName = newName.trim();
+        if (folder?.name.startsWith('Watched ') && !finalName.startsWith('Watched ')) {
+            finalName = `Watched ${finalName}`;
+        }
+        await updateDoc(folderRef, { name: finalName });
         toast({
             title: "Folder Renamed",
             description: `Folder has been renamed to "${newName}".`

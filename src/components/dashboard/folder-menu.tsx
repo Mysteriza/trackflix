@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { MoreHorizontal, Edit, Trash2, Loader2 } from 'lucide-react';
 import { WatchlistFolder } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, formatFolderName } from '@/lib/utils';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -62,7 +62,7 @@ export function FolderMenu({ folder, allFolders, onEdit, onDelete }: FolderMenuP
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: folder.name,
+      name: formatFolderName(folder.name),
     },
   });
 
@@ -107,7 +107,7 @@ export function FolderMenu({ folder, allFolders, onEdit, onDelete }: FolderMenuP
           <DialogHeader>
             <DialogTitle>Rename Folder</DialogTitle>
             <DialogDescription>
-              Enter a new name for the "{folder.name}" folder.
+              Enter a new name for the "{formatFolderName(folder.name)}" folder.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -141,7 +141,7 @@ export function FolderMenu({ folder, allFolders, onEdit, onDelete }: FolderMenuP
        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{folder.name}"?</AlertDialogTitle>
+            <AlertDialogTitle>Delete "{formatFolderName(folder.name)}"?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this folder? All items within it will be moved to your standalone list. This action cannot be undone.
             </AlertDialogDescription>

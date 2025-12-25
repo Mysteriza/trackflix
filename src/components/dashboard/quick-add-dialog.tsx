@@ -18,8 +18,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type { QuickAddItem, WatchlistItemType, WatchlistFolder } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { Card } from '../ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { cn, formatFolderName } from '@/lib/utils';
+import { Check, ChevronDown } from 'lucide-react';
 
 interface QuickAddDialogProps {
   folders: WatchlistFolder[];
@@ -33,8 +36,11 @@ export function QuickAddDialog({ folders, onQuickAdd, children }: QuickAddDialog
   const [items, setItems] = useState<QuickAddItem[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
   const uniqueId = useId();
   const { toast } = useToast();
+
+  const watchedFolders = folders.filter(f => f.name.startsWith('Watched '));
 
   const resetAndClose = () => {
     setOpen(false);
@@ -42,6 +48,7 @@ export function QuickAddDialog({ folders, onQuickAdd, children }: QuickAddDialog
     setItems([]);
     setSelectedFolderId(null);
     setIsSubmitting(false);
+    setComboboxOpen(false);
   };
 
   useEffect(() => {
@@ -162,27 +169,71 @@ Avengers: Endgame`;
           </div>
         </div>
         <DialogFooter className="mt-4 pt-4 border-t flex-col sm:flex-row gap-2 sm:justify-between w-full">
-          <Select onValueChange={(value) => setSelectedFolderId(value === 'standalone' ? null : value)} defaultValue='standalone'>
-            <SelectTrigger className="w-full sm:w-[250px]">
-                <SelectValue placeholder="Select a folder (optional)" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="standalone">
-                    <div className="flex items-center gap-2">
-                        <Folder className="h-4 w-4"/>
-                        <span>Standalone (No Folder)</span>
-                    </div>
-                </SelectItem>
-                {folders.map(folder => (
-                    <SelectItem key={folder.id} value={folder.id}>
-                       <div className="flex items-center gap-2">
-                            <Folder className="h-4 w-4"/>
-                            <span>{folder.name}</span>
-                       </div>
-                    </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={comboboxOpen}
+                className="w-full sm:w-[280px] justify-between h-9 px-3"
+              >
+                <div className="flex items-center gap-2 truncate text-sm">
+                  <Folder className="h-4 w-4 shrink-0 opacity-50" />
+                  <span className="truncate">
+                    {selectedFolderId
+                      ? formatFolderName(watchedFolders.find((f) => f.id === selectedFolderId)?.name || "")
+                      : "Standalone (No Folder)"}
+                  </span>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full sm:w-[280px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search folder..." />
+                <CommandList>
+                  <CommandEmpty>No folder found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="standalone"
+                      onSelect={() => {
+                        setSelectedFolderId(null)
+                        setComboboxOpen(false)
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          selectedFolderId === null ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <Folder className="mr-2 h-4 w-4" />
+                      Standalone (No Folder)
+                    </CommandItem>
+                    {watchedFolders.map((folder) => (
+                      <CommandItem
+                        key={folder.id}
+                        value={folder.name}
+                        onSelect={() => {
+                          setSelectedFolderId(folder.id)
+                          setComboboxOpen(false)
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedFolderId === folder.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <Folder className="mr-2 h-4 w-4" />
+                        {formatFolderName(folder.name)}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <div className='flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto'>
             <Button variant="outline" className='w-full sm:w-auto' onClick={resetAndClose}>Cancel</Button>
             <Button onClick={handleSubmit} disabled={isSubmitting || items.length === 0} className='w-full sm:w-auto'>
