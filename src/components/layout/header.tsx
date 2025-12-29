@@ -41,6 +41,9 @@ export function Header() {
   const { toast } = useToast();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [pendingImportData, setPendingImportData] = useState<{watchlist: any[], folders: any[]} | null>(null);
+  const [importStats, setImportStats] = useState<{watchlistCount: number, foldersCount: number, existingItems: number, existingFolders: number}>({watchlistCount: 0, foldersCount: 0, existingItems: 0, existingFolders: 0});
 
   const handleLogout = async () => {
     setIsLogoutDialogOpen(false);
@@ -61,16 +64,8 @@ export function Header() {
         return data;
       });
 
-      const foldersQuery = query(collection(db, 'folders'), where('userId', '==', user.uid));
-      const foldersSnapshot = await getDocs(foldersQuery);
-      const folders = foldersSnapshot.docs.map(doc => {
-          const { id, ...data } = doc.data() as WatchlistFolder;
-          return data;
-      });
-
       const dataToExport = {
         watchlist,
-        folders,
       };
 
       const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
@@ -90,62 +85,127 @@ export function Header() {
   };
 
   const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user || !event.target.files || !event.target.files.length === 0) return;
+    console.log('[Import] handleImportData triggered');
+    
+    if (!user || !event.target.files || event.target.files.length === 0) {
+      console.log('[Import] Early return - condition failed');
+      return;
+    }
 
     const file = event.target.files[0];
+    console.log('[Import] File selected:', file.name, file.size, 'bytes');
+    
     const reader = new FileReader();
 
-    reader.onload = async (e) => {
-      if (!e.target?.result) return;
-      try {
-        const importedData = JSON.parse(e.target.result as string);
-        const { watchlist: importedWatchlist, folders: importedFolders } = importedData;
+    reader.onerror = (error) => {
+      console.error('[Import] FileReader error:', error);
+      toast({ variant: 'destructive', title: 'Import Failed', description: 'Could not read file.' });
+    };
 
-        if (!Array.isArray(importedWatchlist) || !Array.isArray(importedFolders)) {
-          throw new Error('Invalid backup file format.');
+    reader.onload = async (e) => {
+      console.log('[Import] FileReader onload triggered');
+      if (!e.target?.result) {
+        console.log('[Import] No result from FileReader');
+        return;
+      }
+      
+      try {
+        console.log('[Import] Parsing JSON...');
+        const importedData = JSON.parse(e.target.result as string);
+        console.log('[Import] Parsed data:', importedData);
+        
+        const { watchlist: importedWatchlist = [] } = importedData;
+        console.log('[Import] Watchlist items:', importedWatchlist?.length);
+
+        if (!Array.isArray(importedWatchlist)) {
+          throw new Error('Invalid backup file format - watchlist is not an array.');
         }
 
-        toast({ title: 'Importing data...', description: 'Please wait, this may take a moment.' });
-
-        const batch = writeBatch(db);
-
-        // Clear existing data for user
         const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
         const watchlistSnapshot = await getDocs(watchlistQuery);
-        watchlistSnapshot.forEach((doc) => batch.delete(doc.ref));
 
-        const foldersQuery = query(collection(db, 'folders'), where('userId', '==', user.uid));
-        const foldersSnapshot = await getDocs(foldersQuery);
-        foldersSnapshot.forEach((doc) => batch.delete(doc.ref));
+        setPendingImportData({ watchlist: importedWatchlist, folders: [] });
+        setImportStats({
+          watchlistCount: importedWatchlist.length,
+          foldersCount: 0,
+          existingItems: watchlistSnapshot.size,
+          existingFolders: 0
+        });
+        setIsImportDialogOpen(true);
 
-
-        // Import Folders
-        for (const folder of importedFolders) {
-            const newFolderRef = doc(collection(db, 'folders'));
-            batch.set(newFolderRef, {...folder, userId: user.uid });
-        }
-        
-        // Import Watchlist Items
-        for (const item of importedWatchlist) {
-            const newItemRef = doc(collection(db, 'watchlist'));
-            batch.set(newItemRef, {...item, userId: user.uid});
-        }
-        
-        await batch.commit();
-
-        toast({ title: 'Import Successful', description: 'Your data has been restored.' });
       } catch (error) {
-        console.error('Import Error:', error);
-        toast({ variant: 'destructive', title: 'Import Failed', description: 'Could not import data. Please check the file.' });
+        console.error('[Import] Error:', error);
+        toast({ variant: 'destructive', title: 'Import Failed', description: `Invalid file format: ${(error as Error).message}` });
       } finally {
-        // Reset file input
         if(importInputRef.current) {
           importInputRef.current.value = '';
         }
       }
     };
-    reader.readText(file);
+    
+    console.log('[Import] Starting to read file...');
+    reader.readAsText(file);
   };
+
+  const executeImport = async (mode: 'replace' | 'merge') => {
+    if (!user || !pendingImportData) return;
+    
+    setIsImportDialogOpen(false);
+    toast({ title: 'Importing data...', description: `Mode: ${mode}. Please wait.` });
+
+    try {
+      const batch = writeBatch(db);
+      const { watchlist: importedWatchlist } = pendingImportData;
+
+      if (mode === 'replace') {
+        console.log('[Import] Replace mode - deleting existing data...');
+        const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
+        const watchlistSnapshot = await getDocs(watchlistQuery);
+        watchlistSnapshot.forEach((d) => batch.delete(d.ref));
+      }
+
+      let itemsAdded = 0;
+      let itemsSkipped = 0;
+
+      if (mode === 'merge') {
+        const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
+        const existingSnapshot = await getDocs(watchlistQuery);
+        const existingTitles = new Set(existingSnapshot.docs.map(d => (d.data() as WatchlistItem).title.toLowerCase()));
+
+        for (const item of importedWatchlist) {
+          if (existingTitles.has(item.title?.toLowerCase())) {
+            itemsSkipped++;
+            continue;
+          }
+          const newItemRef = doc(collection(db, 'watchlist'));
+          batch.set(newItemRef, {...item, userId: user.uid, folderId: null});
+          itemsAdded++;
+        }
+      } else {
+        for (const item of importedWatchlist) {
+          const newItemRef = doc(collection(db, 'watchlist'));
+          batch.set(newItemRef, {...item, userId: user.uid, folderId: null});
+          itemsAdded++;
+        }
+      }
+
+      await batch.commit();
+      console.log('[Import] Batch committed successfully!');
+
+      toast({ 
+        title: 'Import Successful', 
+        description: mode === 'replace' 
+          ? `Imported ${itemsAdded} items.`
+          : `Added ${itemsAdded} items${itemsSkipped > 0 ? `, ${itemsSkipped} duplicates skipped` : ''}.`
+      });
+    } catch (error) {
+      console.error('[Import] Error:', error);
+      toast({ variant: 'destructive', title: 'Import Failed', description: `Error: ${(error as Error).message}` });
+    }
+
+    setPendingImportData(null);
+  };
+
   
   if (loading) {
     return (
@@ -215,13 +275,6 @@ export function Header() {
                 <DropdownMenuItem onSelect={() => importInputRef.current?.click()}>
                   <Upload className="mr-2 h-4 w-4" />
                   <span>Import Data</span>
-                  <input
-                    type="file"
-                    ref={importInputRef}
-                    className="hidden"
-                    accept="application/json"
-                    onChange={handleImportData}
-                  />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={(e) => {
@@ -254,6 +307,47 @@ export function Header() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <AlertDialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Import Data</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3">
+              <p>File contains <strong>{importStats.watchlistCount}</strong> items.</p>
+              <p>You have <strong>{importStats.existingItems}</strong> existing items.</p>
+              
+              <div className="bg-muted p-3 rounded-lg text-sm space-y-2">
+                <p><strong>Add New Only (Recommended)</strong></p>
+                <p className="text-muted-foreground">Only adds items not already in TrackFlix. Your existing data stays intact.</p>
+              </div>
+              
+              <div className="bg-destructive/10 p-3 rounded-lg text-sm space-y-2">
+                <p><strong>Replace All (Danger!)</strong></p>
+                <p className="text-muted-foreground">Deletes ALL your data and replaces with file content. Use only for backup restore.</p>
+              </div>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button onClick={() => executeImport('merge')}>
+            Add New Only
+          </Button>
+          <AlertDialogAction onClick={() => executeImport('replace')} className={cn(buttonVariants({ variant: "destructive" }))}>
+            Replace All
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <input
+      type="file"
+      ref={importInputRef}
+      className="hidden"
+      accept="application/json"
+      onChange={handleImportData}
+    />
     </>
   );
 }

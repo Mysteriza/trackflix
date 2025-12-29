@@ -24,12 +24,10 @@ Welcome to TrackFlix, your personal application for managing and tracking movies
 - **Track Status:** Maintain separate lists for Movies and Series you intend to watch.
 - **Mark as Watched:** Move items to your watched history easily when completed.
 - **Details & Notes:** Include personal notes for each item (with a 40-character preview in lists) and specify if content is D21+ (Adult Content). For series, track your progress by season and episode number.
-- **Folders:** Organize items into custom folders for better categorization (e.g., "Sci-Fi Favorites", "Documentaries").
-- **Drag & Drop Reordering:** Reorder items within your lists or folders using drag and drop on desktop.
-- **Mobile Reordering:** Use dedicated up/down arrows for reordering on mobile devices.
+- **Drag & Drop Reordering:** Reorder items within your lists using drag and drop on desktop.
+- 🔄 **Smart Import:** Import JSON data with intelligent duplicate detection. Choose to add new items only or replace all data for seamless Letterboxd synchronization.
 - **Edit Items:** Modify the title, notes, type (movie/series), or D21+ status of any item.
-- **Move Items:** Easily transfer items between different folders or back to the main list.
-- **Bulk Actions:** Select multiple items at once to efficiently move them to a folder or delete them.
+- **Bulk Actions:** Select multiple items at once to efficiently delete them.
 
 **Watched List:**
 
@@ -37,7 +35,6 @@ Welcome to TrackFlix, your personal application for managing and tracking movies
 - **Rating & Review:** Rate watched items on a 0-10 scale (including decimals) and add personal reviews or notes.
 - **Timestamp:** The date and time an item is marked as watched are automatically recorded.
 - **Search & Sort:** Find specific items in your watched history using title search. Sort the list by watched date (newest/oldest) or title (A-Z/Z-A).
-- **Folder Organization:** Watched items maintain their folder assignments, enabling grouped viewing.
 - **Quick Add:** Quickly add multiple titles directly to your watched list, useful for logging past viewing history.
 - **Statistics:** View counts of total watched items, movies, and series on your profile and the watched list tab.
 - **Unwatch:** Correct mistakes by moving an item from your watched history back to your watchlist.
@@ -53,10 +50,10 @@ Welcome to TrackFlix, your personal application for managing and tracking movies
 
 - **Authentication:** Secure user sign-up and login managed by Firebase Authentication.
 - **Profile Management:** Adjust your watchlist's public/private visibility in your profile settings.
-- **Data Export:** Download a complete backup of your watchlist and folder structure in JSON format.
+- **Data Export:** Download a complete backup of your watchlist in JSON format.
 - **Data Import:**
-  - **Watched List Import:** Add watched titles from a JSON file, skipping any duplicates already present.
-  - **Full Data Import:** Restore your entire account data (watchlist and folders) from a backup file (this will replace your current data).
+  - **Add New Only:** Add items from a JSON file, skipping any duplicates already present.
+  - **Replace All:** Restore your entire account data from a backup file (replaces current data).
 - **Delete Account:** Permanently remove your account and all associated data after confirming your identity.
 - **Session Management:** Sessions expire after a period of inactivity for security, but activity resets the timer.
 

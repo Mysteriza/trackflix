@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -10,8 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { GripVertical, Trash2, Move, Edit, ArrowUp, ArrowDown } from 'lucide-react';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import { GripVertical, Trash2, Edit, ArrowUp, ArrowDown } from 'lucide-react';
+import type { WatchlistItem } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -38,13 +37,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { MoveToFolderDialog } from './move-to-folder-dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible';
-
 
 interface WatchlistItemProps {
   item: WatchlistItem;
-  allFolders: WatchlistFolder[];
   items: WatchlistItem[];
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
@@ -54,8 +50,6 @@ interface WatchlistItemProps {
   onUpdate: (id: string, updates: Partial<Omit<WatchlistItem, 'id'>>) => void;
   onDelete: (id: string) => void;
   onUpdateWatched: (item: WatchlistItem, watched: boolean) => void;
-  onMoveToFolder: (itemId: string, folderId: string | null) => void;
-  onMoveItem: (itemId: string, direction: 'up' | 'down') => void;
   handleDragStart: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnter: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -64,7 +58,6 @@ interface WatchlistItemProps {
 
 export function WatchlistItemCard({
   item,
-  allFolders,
   items,
   isSelected,
   onToggleSelect,
@@ -74,8 +67,6 @@ export function WatchlistItemCard({
   onUpdate,
   onDelete,
   onUpdateWatched,
-  onMoveToFolder,
-  onMoveItem,
   handleDragStart,
   handleDragEnter,
   handleDragEnd,
@@ -85,7 +76,6 @@ export function WatchlistItemCard({
   const [notes, setNotes] = useState(item.notes || '');
   const [isD21, setIsD21] = useState(item.isD21 || false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   const [season, setSeason] = useState<string>((item.season ?? '').toString());
   const [episode, setEpisode] = useState<string>((item.episode ?? '').toString());
   const { toast } = useToast();
@@ -115,7 +105,6 @@ export function WatchlistItemCard({
     const num = parseInt(value, 10);
     const finalValue = !isNaN(num) && num > 0 ? num : null;
     
-    // Only update if the value has actually changed
     if (finalValue !== item[field]) {
       onUpdate(item.id, { [field]: finalValue });
     }
@@ -142,7 +131,7 @@ export function WatchlistItemCard({
           className="h-5 w-5"
         />
       </div>
-      {!isMobile ? (
+      {!isMobile && (
         <div
           className={cn(
             "flex items-center self-stretch cursor-grab active:cursor-grabbing",
@@ -151,27 +140,6 @@ export function WatchlistItemCard({
           <div className="flex h-full items-center p-1 sm:p-2 text-muted-foreground" title="Drag to reorder">
               <GripVertical className="h-5 w-5" />
           </div>
-        </div>
-      ) : (
-        <div className="flex flex-col justify-center items-center px-1 sm:px-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onMoveItem(item.id, 'up')}
-              disabled={isFirst}
-            >
-              <ArrowUp className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onMoveItem(item.id, 'down')}
-              disabled={isLast}
-            >
-              <ArrowDown className="h-4 w-4" />
-            </Button>
         </div>
       )}
 
@@ -246,26 +214,6 @@ export function WatchlistItemCard({
                 />
                 <Label htmlFor={`watched-${item.id}`} className={cn("text-sm transition-colors")}>Watched</Label>
               </div>
-
-              <MoveToFolderDialog
-                open={moveDialogOpen}
-                onOpenChange={setMoveDialogOpen}
-                trigger={
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Move className="h-5 w-5 text-blue-500" />
-                  </Button>
-                }
-                itemType={item.type}
-                isWatched={item.watched}
-                allFolders={allFolders}
-                allItems={items}
-                currentFolderId={item.folderId}
-                onMove={(folderId) => {
-                  onMoveToFolder(item.id, folderId);
-                  setMoveDialogOpen(false);
-                }}
-              />
-
 
               <Dialog open={editDialogOpen} onOpenChange={(isOpen) => {
                   setEditDialogOpen(isOpen);

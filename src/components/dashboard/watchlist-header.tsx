@@ -1,18 +1,16 @@
 "use client";
 
-import { Search, X as ClearIcon, PlusCircle, FolderPlus, MoreVertical, FolderCog, Download, Upload, Trash2 } from 'lucide-react';
+import { Search, X as ClearIcon, PlusCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from '@/components/ui/select';
 import { AddItemDialog } from './add-item-dialog';
-import { AddFolderDialog } from './add-folder-dialog';
 import { QuickAddDialog } from './quick-add-dialog';
-import { ManageFoldersDialog } from './manage-folders-dialog';
 import { DuplicateFinderDialog } from './duplicate-finder-dialog';
 import { cn } from '@/lib/utils';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import type { WatchlistItem } from '@/lib/types';
 
 interface WatchlistHeaderProps {
   activeTab: string;
@@ -24,18 +22,10 @@ interface WatchlistHeaderProps {
   setWatchedSearchTerm: (value: string) => void;
   watchedSort: string;
   setWatchedSort: (value: string) => void;
-  folders: WatchlistFolder[];
   items: WatchlistItem[];
-  itemsCountMap: Record<string, number>;
   onAddItem: (itemData: any) => Promise<void>;
-  onAddFolder: (name: string) => Promise<void>;
-  onQuickAdd: (items: any[], folderId: string | null) => Promise<void>;
-  handleEditFolder: (id: string, name: string) => Promise<void>;
-  handleDeleteFolder: (id: string) => Promise<void>;
-  handleBulkDeleteFolders: (ids: string[]) => Promise<void>;
+  onQuickAdd: (items: any[]) => Promise<void>;
   handleDeleteItem: (id: string) => Promise<void>;
-  handleExportWatched: () => Promise<void>;
-  importWatchedInputRef: React.RefObject<HTMLInputElement>;
   setIsResetDialogOpen: (open: boolean) => void;
 }
 
@@ -49,18 +39,10 @@ export function WatchlistHeader({
   setWatchedSearchTerm,
   watchedSort,
   setWatchedSort,
-  folders,
   items,
-  itemsCountMap,
   onAddItem,
-  onAddFolder,
   onQuickAdd,
-  handleEditFolder,
-  handleDeleteFolder,
-  handleBulkDeleteFolders,
   handleDeleteItem,
-  handleExportWatched,
-  importWatchedInputRef,
   setIsResetDialogOpen,
 }: WatchlistHeaderProps) {
   return (
@@ -98,14 +80,6 @@ export function WatchlistHeader({
               </Button>
             </AddItemDialog>
           </div>
-          <div className={cn('flex flex-1 sm:flex-auto', activeTab === 'watched' ? 'hidden' : 'flex')}>
-            <AddFolderDialog onAddFolder={onAddFolder} folders={folders}>
-              <Button variant="secondary" className="w-full">
-                <FolderPlus className="mr-2 h-4 w-4" />
-                Add Folder
-              </Button>
-            </AddFolderDialog>
-          </div>
           <div className={cn("hidden", activeTab === 'watched' ? 'flex w-full sm:w-auto gap-2' : 'hidden')}>
             <Select value={watchedSort} onValueChange={setWatchedSort}>
               <SelectTrigger className='w-full sm:w-auto'>
@@ -121,7 +95,7 @@ export function WatchlistHeader({
                 </SelectGroup>
               </SelectContent>
             </Select>
-            <QuickAddDialog onQuickAdd={onQuickAdd} folders={folders} />
+            <QuickAddDialog onQuickAdd={onQuickAdd} />
           </div>
 
           <DropdownMenu>
@@ -132,39 +106,8 @@ export function WatchlistHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <ManageFoldersDialog
-                allFolders={folders}
-                itemsCountMap={itemsCountMap}
-                onEditFolder={handleEditFolder}
-                onDeleteFolder={handleDeleteFolder}
-                onBulkDeleteFolders={handleBulkDeleteFolders}
-                trigger={
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <FolderCog className="mr-2 h-4 w-4" />
-                    <span>Manage Folders</span>
-                  </DropdownMenuItem>
-                }
-              />
-              <div className={cn(activeTab !== 'watched' ? 'flex flex-col' : 'hidden')}>
-                <DuplicateFinderDialog allItems={items} allFolders={folders} onDeleteItem={handleDeleteItem} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Search className="mr-2 h-4 w-4" />Find Duplicates</DropdownMenuItem>} />
-              </div>
+              <DuplicateFinderDialog allItems={items} onDeleteItem={handleDeleteItem} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Search className="mr-2 h-4 w-4" />Find Duplicates</DropdownMenuItem>} />
               <div className={cn(activeTab === 'watched' ? 'flex flex-col' : 'hidden')}>
-                <AddFolderDialog onAddFolder={onAddFolder} folders={folders}>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <FolderPlus className="mr-2 h-4 w-4" />
-                    <span>Add Folder</span>
-                  </DropdownMenuItem>
-                </AddFolderDialog>
-                <DuplicateFinderDialog allItems={items} allFolders={folders} onDeleteItem={handleDeleteItem} trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Search className="mr-2 h-4 w-4" />Find Duplicates</DropdownMenuItem>} />
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={handleExportWatched}>
-                  <Download className="mr-2 h-4 w-4" />
-                  <span>Export Watched List</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => importWatchedInputRef.current?.click()}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  <span>Import Watched List</span>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => setIsResetDialogOpen(true)} className="text-red-500 focus:text-red-500">
                   <Trash2 className="mr-2 h-4 w-4" />

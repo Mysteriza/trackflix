@@ -321,7 +321,7 @@ export function useWatchlist() {
     }
   };
 
-  const handleQuickAdd = async (quickAddItems: Omit<QuickAddItem, 'key'>[], folderId: string | null) => {
+  const handleQuickAdd = async (quickAddItems: Omit<QuickAddItem, 'key'>[]) => {
     if (!user) return;
 
     const validItems = quickAddItems.filter(item => item.title.trim() !== '');
@@ -351,7 +351,7 @@ export function useWatchlist() {
           watched: true,
           isD21: false,
           order: maxOrder,
-          folderId: folderId,
+          folderId: null,
           createdAt: timestamp,
           watchedAt: timestamp,
           rating: null,
@@ -592,79 +592,6 @@ export function useWatchlist() {
       console.error('Export Error:', error);
       toast({ variant: 'destructive', title: 'Export Failed', description: 'Could not export your watched list.' });
     }
-  };
-
-  const handleImportWatched = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user || !event.target.files || !event.target.files.length) return;
-
-    const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = async (e) => {
-      if (!e.target?.result) return;
-      try {
-        const importedItems = JSON.parse(e.target.result as string);
-
-        if (!Array.isArray(importedItems)) {
-          throw new Error('Invalid backup file format. Expected an array of items.');
-        }
-
-        toast({ title: 'Importing watched list...', description: 'Please wait, this may take a moment.' });
-
-        const currentWatchedItems = items.filter(item => item.watched);
-        const existingTitles = new Set(currentWatchedItems.map(item => item.title.toLowerCase()));
-        let maxOrder = currentWatchedItems.length > 0 ? Math.max(...currentWatchedItems.map(i => i.order)) : 0;
-
-        const batch = writeBatch(db);
-        let itemsAdded = 0;
-
-        importedItems.forEach((item: any) => {
-          const title = item.title?.trim();
-          if (!title || existingTitles.has(title.toLowerCase())) {
-            return;
-          }
-
-          maxOrder++;
-          itemsAdded++;
-          const newItemRef = doc(collection(db, 'watchlist'));
-
-          const newItem: Omit<WatchlistItem, 'id'> = {
-            title: title,
-            type: ['movie', 'series'].includes(item.type) ? item.type : 'movie',
-            userId: user.uid,
-            watched: true,
-            watchedAt: item.watchedAt && (typeof item.watchedAt === 'number' || typeof item.watchedAt === 'object') ? (item.watchedAt.seconds ? new Timestamp(item.watchedAt.seconds, item.watchedAt.nanoseconds).toMillis() : item.watchedAt) : Date.now(),
-            createdAt: item.createdAt && (typeof item.createdAt === 'number' || typeof item.createdAt === 'object') ? (item.createdAt.seconds ? new Timestamp(item.createdAt.seconds, item.createdAt.nanoseconds).toMillis() : item.createdAt) : Date.now(),
-            order: maxOrder,
-            folderId: item.folderId || null,
-            isD21: item.isD21 || false,
-            notes: item.notes || '',
-            rating: typeof item.rating === 'number' ? item.rating : null,
-            season: typeof item.season === 'number' ? item.season : undefined,
-            episode: typeof item.episode === 'number' ? item.episode : undefined,
-            normalizedTitle: undefined
-          };
-
-          batch.set(newItemRef, newItem);
-        });
-
-        if (itemsAdded > 0) {
-            await batch.commit();
-            toast({ title: 'Import Successful', description: `${itemsAdded} new item(s) have been added to your watched list.` });
-        } else {
-            toast({ title: 'Import Complete', description: 'No new items were added. The items may already exist in your list.' });
-        }
-
-      } catch (error) {
-        console.error('Import Error:', error);
-        toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import data. Please check the file format. Error: ${(error as Error).message}` });
-      } finally {
-        if (importWatchedInputRef.current) {
-          importWatchedInputRef.current.value = '';
-        }
-      }
-    };
-    reader.readAsText(file);
   };
 
   const reorderItems = async (list: WatchlistItem[]) => {
@@ -1082,7 +1009,6 @@ export function useWatchlist() {
     handleBulkDelete,
     handleDeleteAllWatched,
     handleExportWatched,
-    handleImportWatched,
     handleMoveToFolder,
     handleMoveItem,
     handleDragStart,

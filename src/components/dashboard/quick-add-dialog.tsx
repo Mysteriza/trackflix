@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useId, ReactNode } from 'react';
-import { PlusCircle, Film, Tv, Sparkles, Loader2, Folder } from 'lucide-react';
+import { PlusCircle, Film, Tv, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,40 +15,29 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { QuickAddItem, WatchlistItemType, WatchlistFolder } from '@/lib/types';
+import type { QuickAddItem, WatchlistItemType } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { Card } from '../ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { cn, formatFolderName } from '@/lib/utils';
-import { Check, ChevronDown } from 'lucide-react';
 
 interface QuickAddDialogProps {
-  folders: WatchlistFolder[];
-  onQuickAdd: (items: Omit<QuickAddItem, 'key'>[], folderId: string | null) => void;
+  onQuickAdd: (items: Omit<QuickAddItem, 'key'>[]) => void;
   children?: ReactNode;
 }
 
-export function QuickAddDialog({ folders, onQuickAdd, children }: QuickAddDialogProps) {
+export function QuickAddDialog({ onQuickAdd, children }: QuickAddDialogProps) {
   const [open, setOpen] = useState(false);
   const [textValue, setTextValue] = useState('');
   const [items, setItems] = useState<QuickAddItem[]>([]);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [comboboxOpen, setComboboxOpen] = useState(false);
   const uniqueId = useId();
   const { toast } = useToast();
-
-  const watchedFolders = folders.filter(f => f.name.startsWith('Watched '));
 
   const resetAndClose = () => {
     setOpen(false);
     setTextValue('');
     setItems([]);
-    setSelectedFolderId(null);
     setIsSubmitting(false);
-    setComboboxOpen(false);
   };
 
   useEffect(() => {
@@ -86,7 +75,7 @@ export function QuickAddDialog({ folders, onQuickAdd, children }: QuickAddDialog
       return;
     }
 
-    await onQuickAdd(validItems, selectedFolderId);
+    await onQuickAdd(validItems);
     resetAndClose();
   };
 
@@ -168,72 +157,7 @@ Avengers: Endgame`;
             </ScrollArea>
           </div>
         </div>
-        <DialogFooter className="mt-4 pt-4 border-t flex-col sm:flex-row gap-2 sm:justify-between w-full">
-          <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={comboboxOpen}
-                className="w-full sm:w-[280px] justify-between h-9 px-3"
-              >
-                <div className="flex items-center gap-2 truncate text-sm">
-                  <Folder className="h-4 w-4 shrink-0 opacity-50" />
-                  <span className="truncate">
-                    {selectedFolderId
-                      ? formatFolderName(watchedFolders.find((f) => f.id === selectedFolderId)?.name || "")
-                      : "Standalone (No Folder)"}
-                  </span>
-                </div>
-                <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full sm:w-[280px] p-0" align="start">
-              <Command>
-                <CommandInput placeholder="Search folder..." />
-                <CommandList>
-                  <CommandEmpty>No folder found.</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      value="standalone"
-                      onSelect={() => {
-                        setSelectedFolderId(null)
-                        setComboboxOpen(false)
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          selectedFolderId === null ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <Folder className="mr-2 h-4 w-4" />
-                      Standalone (No Folder)
-                    </CommandItem>
-                    {watchedFolders.map((folder) => (
-                      <CommandItem
-                        key={folder.id}
-                        value={folder.name}
-                        onSelect={() => {
-                          setSelectedFolderId(folder.id)
-                          setComboboxOpen(false)
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedFolderId === folder.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        <Folder className="mr-2 h-4 w-4" />
-                        {formatFolderName(folder.name)}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+        <DialogFooter className="mt-4 pt-4 border-t flex-col sm:flex-row gap-2 sm:justify-end w-full">
           <div className='flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto'>
             <Button variant="outline" className='w-full sm:w-auto' onClick={resetAndClose}>Cancel</Button>
             <Button onClick={handleSubmit} disabled={isSubmitting || items.length === 0} className='w-full sm:w-auto'>

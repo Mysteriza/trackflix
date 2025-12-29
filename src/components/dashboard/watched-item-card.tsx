@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -41,20 +40,18 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Slider } from '../ui/slider';
-import { Star, Film, Tv, Edit, Trash2, MoreVertical, RotateCcw, MessageSquare, Move, Maximize2 } from 'lucide-react';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import { Star, Film, Tv, Edit, Trash2, MoreVertical, RotateCcw, MessageSquare } from 'lucide-react';
+import type { WatchlistItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { buttonVariants } from '../ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Form, FormItem, FormLabel, FormControl, FormMessage, FormField } from '../ui/form';
-import { MoveToFolderDialog } from './move-to-folder-dialog';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '../ui/collapsible';
 
 interface WatchedItemCardProps {
   item: WatchlistItem;
-  allFolders: WatchlistFolder[];
   items: WatchlistItem[];
   isDragging: boolean;
   isSelected: boolean;
@@ -63,7 +60,6 @@ interface WatchedItemCardProps {
   onUpdate: (id: string, updates: Partial<Omit<WatchlistItem, 'id'>>) => void;
   onDelete: (id: string) => void;
   onUpdateWatched: (item: WatchlistItem, watched: boolean) => void;
-  onMoveToFolder: (itemId: string, folderId: string | null) => void;
   handleDragStart: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnter: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -75,7 +71,6 @@ const formSchema = z.object({
 
 export function WatchedItemCard({
   item,
-  allFolders,
   items,
   isDragging,
   isSelected,
@@ -84,7 +79,6 @@ export function WatchedItemCard({
   onUpdate,
   onDelete,
   onUpdateWatched,
-  onMoveToFolder,
   handleDragStart,
   handleDragEnter,
   handleDragEnd,
@@ -92,7 +86,6 @@ export function WatchedItemCard({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rateDialogOpen, setRateDialogOpen] = useState(false);
-  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
   
   const [title, setTitle] = useState(item.title);
   const [isD21, setIsD21] = useState(item.isD21 || false);
@@ -188,9 +181,6 @@ export function WatchedItemCard({
                         <DropdownMenuItem onSelect={() => setEditDialogOpen(true)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setMoveDialogOpen(true)}>
-                          <Move className="mr-2 h-4 w-4" /> Move to Folder
-                        </DropdownMenuItem>
                         <DropdownMenuItem onSelect={handleUnwatch}>
                             <RotateCcw className="mr-2 h-4 w-4" /> Move to Watchlist
                         </DropdownMenuItem>
@@ -243,7 +233,6 @@ export function WatchedItemCard({
       </CardContent>
     </Card>
 
-    {/* Edit Dialog */}
     <Dialog open={editDialogOpen} onOpenChange={(isOpen) => {
         setEditDialogOpen(isOpen);
         if (isOpen) {
@@ -312,7 +301,6 @@ export function WatchedItemCard({
         </DialogContent>
     </Dialog>
     
-    {/* Rate/Review Dialog */}
     <Dialog open={rateDialogOpen} onOpenChange={(isOpen) => {
         setRateDialogOpen(isOpen);
         if (isOpen) {
@@ -353,23 +341,7 @@ export function WatchedItemCard({
           </DialogFooter>
         </DialogContent>
     </Dialog>
-    
-    <MoveToFolderDialog
-      open={moveDialogOpen}
-      onOpenChange={setMoveDialogOpen}
-      itemType={item.type}
-      isWatched={item.watched}
-      allFolders={allFolders}
-      allItems={items}
-      currentFolderId={item.folderId}
-      onMove={(folderId) => {
-        onMoveToFolder(item.id, folderId);
-        setMoveDialogOpen(false);
-      }}
-    />
 
-
-    {/* Delete Dialog */}
     <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -387,5 +359,3 @@ export function WatchedItemCard({
     </>
   );
 }
-
-    

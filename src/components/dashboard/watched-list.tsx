@@ -3,16 +3,15 @@
 import { cn } from '@/lib/utils';
 import { WatchedItemCard } from './watched-item-card';
 import { PaginationControls } from './pagination-controls';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import type { WatchlistItem } from '@/lib/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-interface WatchedListProps {
+export interface WatchedListProps {
   list: WatchlistItem[];
   currentPage: number;
   itemsPerPage: number;
   onPageChange: (page: number) => void;
   onItemsPerPageChange: (itemsPerPage: number) => void;
-  folders: WatchlistFolder[];
   allItems: WatchlistItem[];
   selectedItemIds: string[];
   handleToggleSelectItem: (id: string) => void;
@@ -21,7 +20,6 @@ interface WatchedListProps {
   handleUpdateItem: (id: string, updates: any) => Promise<void>;
   handleDeleteItem: (id: string) => Promise<void>;
   handleUpdateWatched: (item: WatchlistItem, watched: boolean) => Promise<void>;
-  handleMoveToFolder: (itemId: string, folderId: string | null) => Promise<void>;
   handleDragStart: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnter: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnd: () => Promise<void>;
@@ -33,7 +31,6 @@ export function WatchedList({
   itemsPerPage,
   onPageChange,
   onItemsPerPageChange,
-  folders,
   allItems,
   selectedItemIds,
   handleToggleSelectItem,
@@ -42,7 +39,6 @@ export function WatchedList({
   handleUpdateItem,
   handleDeleteItem,
   handleUpdateWatched,
-  handleMoveToFolder,
   handleDragStart,
   handleDragEnter,
   handleDragEnd,
@@ -65,7 +61,6 @@ export function WatchedList({
           >
             <WatchedItemCard
               item={item}
-              allFolders={folders}
               items={allItems}
               isDragging={!isMobile && draggedItem?.id === item.id}
               isSelected={selectedItemIds.includes(item.id)}
@@ -74,7 +69,6 @@ export function WatchedList({
               onUpdate={handleUpdateItem}
               onDelete={handleDeleteItem}
               onUpdateWatched={handleUpdateWatched}
-              onMoveToFolder={handleMoveToFolder}
               handleDragStart={handleDragStart}
               handleDragEnter={handleDragEnter}
               handleDragEnd={handleDragEnd}

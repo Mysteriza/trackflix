@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState } from 'react';
-import { Folder, Trash2, X, Move } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -14,41 +13,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { WatchlistFolder, WatchlistItem } from '@/lib/types';
+import { WatchlistItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { MoveToFolderDialog } from './move-to-folder-dialog';
 
 interface BulkActionBarProps {
   selectedCount: number;
-  folders: WatchlistFolder[];
   items: WatchlistItem[];
   activeTab: 'movies' | 'series' | 'watched';
   selectedItemIds: string[];
   onClear: () => void;
-  onMove: (folderId: string | null) => void;
   onDelete: () => void;
 }
 
 export function BulkActionBar({
   selectedCount,
-  folders,
   items,
   activeTab,
   selectedItemIds,
   onClear,
-  onMove,
   onDelete,
 }: BulkActionBarProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
 
   if (selectedCount === 0) {
     return null;
   }
-  
-  const selectedItems = items.filter(item => selectedItemIds.includes(item.id));
-  const firstSelectedItem = selectedItems[0];
-
 
   return (
     <>
@@ -65,25 +54,6 @@ export function BulkActionBar({
           </div>
 
           <div className="flex items-center gap-2">
-            <MoveToFolderDialog
-              open={isMoveDialogOpen}
-              onOpenChange={setIsMoveDialogOpen}
-              trigger={
-                <Button variant="secondary">
-                  <Move className="mr-2 h-4 w-4" />
-                  Move
-                </Button>
-              }
-              itemType={activeTab === 'watched' ? firstSelectedItem?.type : activeTab === 'movies' ? 'movie' : 'series'}
-              isWatched={activeTab === 'watched'}
-              allFolders={folders}
-              allItems={items}
-              currentFolderId={null}
-              onMove={(folderId) => {
-                onMove(folderId);
-                setIsMoveDialogOpen(false);
-              }}
-            />
             <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete

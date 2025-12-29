@@ -3,17 +3,16 @@
 import { cn } from '@/lib/utils';
 import { WatchlistItemCard } from './watchlist-item';
 import { PaginationControls } from './pagination-controls';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import type { WatchlistItem } from '@/lib/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-interface UnwatchedListProps {
+export interface UnwatchedListProps {
   list: WatchlistItem[];
   isPaginated?: boolean;
   currentPage: number;
   itemsPerPage: number;
   onPageChange: (page: number) => void;
   onItemsPerPageChange: (itemsPerPage: number) => void;
-  folders: WatchlistFolder[];
   allItems: WatchlistItem[];
   selectedItemIds: string[];
   handleToggleSelectItem: (id: string) => void;
@@ -22,8 +21,6 @@ interface UnwatchedListProps {
   handleUpdateItem: (id: string, updates: any) => Promise<void>;
   handleDeleteItem: (id: string) => Promise<void>;
   handleUpdateWatched: (item: WatchlistItem, watched: boolean) => Promise<void>;
-  handleMoveToFolder: (itemId: string, folderId: string | null) => Promise<void>;
-  handleMoveItem: (itemId: string, direction: 'up' | 'down') => Promise<void>;
   handleDragStart: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnter: (e: React.DragEvent<HTMLDivElement>, item: WatchlistItem) => void;
   handleDragEnd: () => Promise<void>;
@@ -36,7 +33,6 @@ export function UnwatchedList({
   itemsPerPage,
   onPageChange,
   onItemsPerPageChange,
-  folders,
   allItems,
   selectedItemIds,
   handleToggleSelectItem,
@@ -45,8 +41,6 @@ export function UnwatchedList({
   handleUpdateItem,
   handleDeleteItem,
   handleUpdateWatched,
-  handleMoveToFolder,
-  handleMoveItem,
   handleDragStart,
   handleDragEnter,
   handleDragEnd,
@@ -78,7 +72,6 @@ export function UnwatchedList({
             <div className="flex-1">
               <WatchlistItemCard
                 item={item}
-                allFolders={folders}
                 items={allItems}
                 isSelected={selectedItemIds.includes(item.id)}
                 onToggleSelect={handleToggleSelectItem}
@@ -88,8 +81,6 @@ export function UnwatchedList({
                 onUpdate={handleUpdateItem}
                 onDelete={handleDeleteItem}
                 onUpdateWatched={handleUpdateWatched}
-                onMoveToFolder={handleMoveToFolder}
-                onMoveItem={handleMoveItem}
                 handleDragStart={handleDragStart}
                 handleDragEnter={handleDragEnter}
                 handleDragEnd={handleDragEnd}

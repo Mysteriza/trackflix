@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, ReactNode } from 'react';
-import { Search, Loader2, Trash2, Film, Tv, Folder } from 'lucide-react';
+import { useState, ReactNode } from 'react';
+import { Search, Loader2, Trash2, Film, Tv } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,13 +24,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import type { WatchlistItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface DuplicateFinderDialogProps {
   allItems: WatchlistItem[];
-  allFolders: WatchlistFolder[];
   onDeleteItem: (id: string) => void;
   trigger?: ReactNode;
 }
@@ -53,7 +52,6 @@ const normalizeTitleForDuplicateCheck = (title: string): string => {
 
 export function DuplicateFinderDialog({
   allItems,
-  allFolders,
   onDeleteItem,
   trigger
 }: DuplicateFinderDialogProps) {
@@ -62,13 +60,6 @@ export function DuplicateFinderDialog({
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
   const [itemToDelete, setItemToDelete] = useState<WatchlistItem | null>(null);
   const { toast } = useToast();
-
-  const folderMap = useMemo(() => {
-    return allFolders.reduce((acc, folder) => {
-      acc[folder.id] = folder.name;
-      return acc;
-    }, {} as Record<string, string>);
-  }, [allFolders]);
 
   const findDuplicates = () => {
     setIsSearching(true);
@@ -198,12 +189,6 @@ export function DuplicateFinderDialog({
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
                                 {getStatusBadge(item)}
                                 {item.type === 'movie' ? <Film className='h-4 w-4'/> : <Tv className='h-4 w-4'/>}
-                                {item.folderId && folderMap[item.folderId] && (
-                                  <div className="flex items-center gap-1">
-                                    <Folder className="h-3 w-3" />
-                                    <span>{folderMap[item.folderId]}</span>
-                                  </div>
-                                )}
                               </div>
                             </div>
                             <Button
