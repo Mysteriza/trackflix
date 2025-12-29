@@ -1,22 +1,21 @@
 
 "use client";
 
-import { useState, useEffect, useMemo, ReactNode } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue, ReactNode } from 'react';
 import { useParams } from 'next/navigation';
 import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { UserProfile, WatchlistItem, WatchlistFolder } from '@/lib/types';
+import type { UserProfile, WatchlistItem } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, Lock, Film, Tv, Star, Search, Folder, Maximize2 } from 'lucide-react';
+import { User, Lock, Film, Tv, Star, Search, Maximize2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -74,7 +73,6 @@ function PublicWatchedItemCard({ item }: { item: WatchlistItem }) {
 
 function PublicWatchlist({ userId }: { userId: string }) {
   const [items, setItems] = useState<WatchlistItem[]>([]);
-  const [folders, setFolders] = useState<WatchlistFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('watched');
   const [watchedSearchTerm, setWatchedSearchTerm] = useState('');
@@ -83,7 +81,6 @@ function PublicWatchlist({ userId }: { userId: string }) {
   useEffect(() => {
     setLoading(true);
     const itemsQuery = query(collection(db, 'watchlist'), where('userId', '==', userId));
-    const foldersQuery = query(collection(db, 'folders'), where('userId', '==', userId));
 
     const unsubscribeItems = onSnapshot(itemsQuery, (snapshot) => {
       const fetchedItems: WatchlistItem[] = [];
@@ -93,30 +90,24 @@ function PublicWatchlist({ userId }: { userId: string }) {
     }, () => {
       setLoading(false);
       setItems([]);
-      setFolders([]);
-    });
-
-    const unsubscribeFolders = onSnapshot(foldersQuery, (snapshot) => {
-        const fetchedFolders: WatchlistFolder[] = [];
-        snapshot.forEach(doc => fetchedFolders.push({ id: doc.id, ...doc.data() } as WatchlistFolder));
-        setFolders(fetchedFolders.sort((a,b) => a.order - b.order));
     });
 
     return () => {
       unsubscribeItems();
-      unsubscribeFolders();
     };
   }, [userId]);
 
   const unwatchedMovies = useMemo(() => items.filter(item => !item.watched && item.type === 'movie').sort((a,b) => a.order - b.order), [items]);
   const unwatchedSeries = useMemo(() => items.filter(item => !item.watched && item.type === 'series').sort((a,b) => a.order - b.order), [items]);
   
+  const deferredWatchedSearchTerm = useDeferredValue(watchedSearchTerm);
+
   const watchedItems = useMemo(() => {
     let filtered = items.filter(item => item.watched);
 
-    if (watchedSearchTerm) {
+    if (deferredWatchedSearchTerm) {
       filtered = filtered.filter(item =>
-        item.title.toLowerCase().includes(watchedSearchTerm.toLowerCase())
+        item.title.toLowerCase().includes(deferredWatchedSearchTerm.toLowerCase())
       );
     }
 
@@ -133,58 +124,10 @@ function PublicWatchlist({ userId }: { userId: string }) {
           return (b.watchedAt || 0) - (a.watchedAt || 0);
       }
     });
-  }, [items, watchedSearchTerm, watchedSort]);
+  }, [items, deferredWatchedSearchTerm, watchedSort]);
 
-
-  const getCategorizedUnwatchedItems = (type: 'movie' | 'series') => {
-    const relevantItems = type === 'movie' ? unwatchedMovies : unwatchedSeries;
-    const itemsByFolder = folders.reduce((acc, folder) => {
-      acc[folder.id] = [];
-      return acc;
-    }, {} as Record<string, WatchlistItem[]>);
-
-    const standaloneItems: WatchlistItem[] = [];
-
-    relevantItems.forEach(item => {
-      if (item.folderId && itemsByFolder[item.folderId]) {
-        itemsByFolder[item.folderId].push(item);
-      } else {
-        standaloneItems.push(item);
-      }
-    });
-    
-    Object.values(itemsByFolder).forEach(list => list.sort((a,b) => a.order - b.order));
-    standaloneItems.sort((a,b) => a.order - b.order);
-
-    return { standalone: standaloneItems, byFolder: itemsByFolder };
-  };
-
-  const getCategorizedWatchedItems = () => {
-    const itemsByFolder = folders.reduce((acc, folder) => {
-      acc[folder.id] = [];
-      return acc;
-    }, {} as Record<string, WatchlistItem[]>);
-
-    const standaloneItems: WatchlistItem[] = [];
-
-    watchedItems.forEach(item => {
-      if(item.folderId && itemsByFolder[item.folderId]) {
-        itemsByFolder[item.folderId].push(item);
-      } else {
-        standaloneItems.push(item);
-      }
-    });
-
-    return { standalone: standaloneItems, byFolder: itemsByFolder };
-  }
-
-  const movies = useMemo(() => getCategorizedUnwatchedItems('movie'), [unwatchedMovies, folders]);
-  const series = useMemo(() => getCategorizedUnwatchedItems('series'), [unwatchedSeries, folders]);
-  const watchedCategorized = useMemo(() => getCategorizedWatchedItems(), [watchedItems, folders]);
-
-
-  const renderUnwatchedList = (list: WatchlistItem[]) => {
-    if (list.length === 0) return <p className="text-muted-foreground text-center py-4">This list is empty.</p>;
+  const renderUnwatchedList = (list: WatchlistItem[], type: 'movie' | 'series') => {
+    if (list.length === 0) return <p className="text-muted-foreground text-center py-4">This user hasn't added any {type} to their watchlist yet.</p>;
 
     return (
       <div className="space-y-3">
@@ -201,53 +144,13 @@ function PublicWatchlist({ userId }: { userId: string }) {
     );
   }
 
-  const renderCategorizedUnwatched = (data: ReturnType<typeof getCategorizedUnwatchedItems>) => {
-    const hasStandalone = data.standalone.length > 0;
-    const visibleFolders = folders.filter(folder => data.byFolder[folder.id]?.length > 0);
-
-    if (!hasStandalone && visibleFolders.length === 0) {
-      return <p className="text-muted-foreground text-center py-8">This user hasn't added anything to their watchlist yet.</p>;
-    }
-
-    return (
-      <div className="space-y-8">
-        {visibleFolders.length > 0 && (
-          <Accordion type="multiple" className="w-full space-y-4">
-            {visibleFolders.map(folder => {
-              const folderItems = data.byFolder[folder.id] || [];
-              return (
-                <AccordionItem value={folder.id} key={folder.id} className="border rounded-lg bg-card">
-                  <div className="flex items-center px-4">
-                    <AccordionTrigger className="text-lg font-semibold hover:no-underline flex-1 py-3 sm:py-4">
-                      <div className='flex items-center gap-2'>
-                        <Folder className='text-primary'/>
-                        <span className='flex-1 text-left'>{folder.name} ({folderItems.length})</span>
-                      </div>
-                    </AccordionTrigger>
-                  </div>
-                  <AccordionContent className="p-4 pt-0">
-                    {renderUnwatchedList(folderItems)}
-                  </AccordionContent>
-                </AccordionItem>
-              )
-            })}
-          </Accordion>
-        )}
-
-        {hasStandalone && (
-          <div>
-            {visibleFolders.length > 0 && <Separator className="my-8"/>}
-            <h3 className="text-2xl font-bold mb-6">Standalone ({data.standalone.length})</h3>
-            <p className="text-muted-foreground mb-4">Items this user wants to watch that aren't in a folder.</p>
-            {renderUnwatchedList(data.standalone)}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const renderWatchedGrid = (list: WatchlistItem[]) => {
-    if (list.length === 0) return <p className="text-muted-foreground text-center py-4">No watched items here.</p>;
+    if (list.length === 0) {
+      if (watchedSearchTerm) {
+          return <p className="text-muted-foreground text-center py-8">No results found for "{watchedSearchTerm}".</p>;
+      }
+      return <p className="text-muted-foreground text-center py-4">No watched items here.</p>;
+    }
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -256,52 +159,6 @@ function PublicWatchlist({ userId }: { userId: string }) {
           ))}
         </div>
     );
-  };
-  
-  const renderCategorizedWatched = (data: ReturnType<typeof getCategorizedWatchedItems>) => {
-      const hasStandalone = data.standalone.length > 0;
-      const visibleFolders = folders.filter(folder => data.byFolder[folder.id]?.length > 0);
-
-      if (!hasStandalone && visibleFolders.length === 0) {
-        if (watchedSearchTerm) {
-            return <p className="text-muted-foreground text-center py-8">No results found for "{watchedSearchTerm}".</p>;
-        }
-        return <p className="text-muted-foreground text-center py-8">This user hasn't marked anything as watched yet.</p>;
-      }
-
-      return (
-        <div className="space-y-8">
-          {visibleFolders.length > 0 && (
-            <Accordion type="multiple" className="w-full space-y-4">
-                {visibleFolders.map(folder => {
-                    const folderItems = data.byFolder[folder.id] || [];
-                    return (
-                        <AccordionItem value={folder.id} key={folder.id} className="border rounded-lg bg-card">
-                            <div className="flex items-center px-4">
-                                <AccordionTrigger className="text-lg font-semibold hover:no-underline flex-1 py-3 sm:py-4">
-                                    <div className='flex items-center gap-2'>
-                                        <Folder className='text-primary'/>
-                                        <span className='flex-1 text-left'>{folder.name} ({folderItems.length})</span>
-                                    </div>
-                                </AccordionTrigger>
-                            </div>
-                            <AccordionContent className="p-4 pt-0">
-                                {renderWatchedGrid(folderItems)}
-                            </AccordionContent>
-                        </AccordionItem>
-                    )
-                })}
-            </Accordion>
-          )}
-          {hasStandalone && (
-            <div>
-              {visibleFolders.length > 0 && <Separator className="my-8"/>}
-              <h3 className="text-2xl font-bold mb-6">Standalone ({data.standalone.length})</h3>
-              {renderWatchedGrid(data.standalone)}
-            </div>
-          )}
-        </div>
-      )
   };
 
 
@@ -349,11 +206,11 @@ function PublicWatchlist({ userId }: { userId: string }) {
                     </SelectContent>
                 </Select>
             </div>
-            {renderCategorizedWatched(watchedCategorized)}
+            {renderWatchedGrid(watchedItems)}
         </div>
       </TabsContent>
-      <TabsContent value="movies">{renderCategorizedUnwatched(movies)}</TabsContent>
-      <TabsContent value="series">{renderCategorizedUnwatched(series)}</TabsContent>
+      <TabsContent value="movies">{renderUnwatchedList(unwatchedMovies, 'movie')}</TabsContent>
+      <TabsContent value="series">{renderUnwatchedList(unwatchedSeries, 'series')}</TabsContent>
     </Tabs>
   );
 }

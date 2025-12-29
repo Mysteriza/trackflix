@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -30,9 +29,9 @@ import { signOut } from 'firebase/auth';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { ThemeToggle } from '../theme-toggle';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, normalizeTitle } from '@/lib/utils';
 import { useState, useRef } from 'react';
-import type { WatchlistItem, WatchlistFolder } from '@/lib/types';
+import type { WatchlistItem } from '@/lib/types';
 import { ProfileDialog } from '../dashboard/profile-dialog';
 
 export function Header() {
@@ -42,8 +41,8 @@ export function Header() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [pendingImportData, setPendingImportData] = useState<{watchlist: any[], folders: any[]} | null>(null);
-  const [importStats, setImportStats] = useState<{watchlistCount: number, foldersCount: number, existingItems: number, existingFolders: number}>({watchlistCount: 0, foldersCount: 0, existingItems: 0, existingFolders: 0});
+  const [pendingImportData, setPendingImportData] = useState<{watchlist: any[]} | null>(null);
+  const [importStats, setImportStats] = useState<{watchlistCount: number, existingItems: number}>({watchlistCount: 0, existingItems: 0});
 
   const handleLogout = async () => {
     setIsLogoutDialogOpen(false);
@@ -60,14 +59,12 @@ export function Header() {
       const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
       const watchlistSnapshot = await getDocs(watchlistQuery);
       const watchlist = watchlistSnapshot.docs.map(doc => {
-        const { id, ...data } = doc.data() as WatchlistItem;
-        return data;
+        const data = doc.data();
+        const { id, folderId, ...cleanData } = data as any;
+        return cleanData;
       });
 
-      const dataToExport = {
-        watchlist,
-      };
-
+      const dataToExport = { watchlist };
       const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -85,37 +82,21 @@ export function Header() {
   };
 
   const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[Import] handleImportData triggered');
-    
-    if (!user || !event.target.files || event.target.files.length === 0) {
-      console.log('[Import] Early return - condition failed');
-      return;
-    }
+    if (!user || !event.target.files || event.target.files.length === 0) return;
 
     const file = event.target.files[0];
-    console.log('[Import] File selected:', file.name, file.size, 'bytes');
-    
     const reader = new FileReader();
 
-    reader.onerror = (error) => {
-      console.error('[Import] FileReader error:', error);
+    reader.onerror = () => {
       toast({ variant: 'destructive', title: 'Import Failed', description: 'Could not read file.' });
     };
 
     reader.onload = async (e) => {
-      console.log('[Import] FileReader onload triggered');
-      if (!e.target?.result) {
-        console.log('[Import] No result from FileReader');
-        return;
-      }
+      if (!e.target?.result) return;
       
       try {
-        console.log('[Import] Parsing JSON...');
         const importedData = JSON.parse(e.target.result as string);
-        console.log('[Import] Parsed data:', importedData);
-        
         const { watchlist: importedWatchlist = [] } = importedData;
-        console.log('[Import] Watchlist items:', importedWatchlist?.length);
 
         if (!Array.isArray(importedWatchlist)) {
           throw new Error('Invalid backup file format - watchlist is not an array.');
@@ -124,17 +105,14 @@ export function Header() {
         const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
         const watchlistSnapshot = await getDocs(watchlistQuery);
 
-        setPendingImportData({ watchlist: importedWatchlist, folders: [] });
+        setPendingImportData({ watchlist: importedWatchlist });
         setImportStats({
           watchlistCount: importedWatchlist.length,
-          foldersCount: 0,
           existingItems: watchlistSnapshot.size,
-          existingFolders: 0
         });
         setIsImportDialogOpen(true);
 
       } catch (error) {
-        console.error('[Import] Error:', error);
         toast({ variant: 'destructive', title: 'Import Failed', description: `Invalid file format: ${(error as Error).message}` });
       } finally {
         if(importInputRef.current) {
@@ -143,7 +121,6 @@ export function Header() {
       }
     };
     
-    console.log('[Import] Starting to read file...');
     reader.readAsText(file);
   };
 
@@ -158,7 +135,6 @@ export function Header() {
       const { watchlist: importedWatchlist } = pendingImportData;
 
       if (mode === 'replace') {
-        console.log('[Import] Replace mode - deleting existing data...');
         const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
         const watchlistSnapshot = await getDocs(watchlistQuery);
         watchlistSnapshot.forEach((d) => batch.delete(d.ref));
@@ -170,27 +146,28 @@ export function Header() {
       if (mode === 'merge') {
         const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
         const existingSnapshot = await getDocs(watchlistQuery);
-        const existingTitles = new Set(existingSnapshot.docs.map(d => (d.data() as WatchlistItem).title.toLowerCase()));
+        const existingTitles = new Set(existingSnapshot.docs.map(d => normalizeTitle((d.data() as WatchlistItem).title)));
 
         for (const item of importedWatchlist) {
-          if (existingTitles.has(item.title?.toLowerCase())) {
+          if (existingTitles.has(normalizeTitle(item.title || ''))) {
             itemsSkipped++;
             continue;
           }
           const newItemRef = doc(collection(db, 'watchlist'));
-          batch.set(newItemRef, {...item, userId: user.uid, folderId: null});
+          const { folderId, ...cleanItem } = item;
+          batch.set(newItemRef, {...cleanItem, userId: user.uid});
           itemsAdded++;
         }
       } else {
         for (const item of importedWatchlist) {
           const newItemRef = doc(collection(db, 'watchlist'));
-          batch.set(newItemRef, {...item, userId: user.uid, folderId: null});
+          const { folderId, ...cleanItem } = item;
+          batch.set(newItemRef, {...cleanItem, userId: user.uid});
           itemsAdded++;
         }
       }
 
       await batch.commit();
-      console.log('[Import] Batch committed successfully!');
 
       toast({ 
         title: 'Import Successful', 
@@ -199,7 +176,7 @@ export function Header() {
           : `Added ${itemsAdded} items${itemsSkipped > 0 ? `, ${itemsSkipped} duplicates skipped` : ''}.`
       });
     } catch (error) {
-      console.error('[Import] Error:', error);
+      console.error('Import Error:', error);
       toast({ variant: 'destructive', title: 'Import Failed', description: `Error: ${(error as Error).message}` });
     }
 
@@ -230,45 +207,39 @@ export function Header() {
           <span className="text-xl font-bold">TrackFlix</span>
         </Link>
         <div className="flex flex-1 items-center justify-end space-x-2">
-          <Link href="/social" className={cn(buttonVariants({ variant: 'ghost' }), 'hidden sm:inline-flex')}>
-            <Users className="mr-2 h-4 w-4" />
-            Social
-          </Link>
           <ThemeToggle />
-          { user && (
+          {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={user?.photoURL || ''} alt="User Avatar" />
-                    <AvatarFallback>
-                      {user?.displayName?.charAt(0) || <User />}
-                    </AvatarFallback>
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || 'User'} />
+                    <AvatarFallback>{user.displayName?.charAt(0) || user.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.displayName || 'User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {user?.email}
-                    </p>
+                    <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <ProfileDialog trigger={
+                <ProfileDialog>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                } />
-                <DropdownMenuItem onSelect={() => router.push('/social')} className="sm:hidden">
-                  <Users className="mr-2 h-4 w-4" />
-                  <span>Social</span>
-                </DropdownMenuItem>
+                </ProfileDialog>
+                <Link href="/social">
+                  <DropdownMenuItem>
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>Social</span>
+                  </DropdownMenuItem>
+                </Link>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleExportData}>
+                <DropdownMenuItem onSelect={handleExportData}>
                   <Download className="mr-2 h-4 w-4" />
                   <span>Export Data</span>
                 </DropdownMenuItem>
@@ -277,12 +248,9 @@ export function Header() {
                   <span>Import Data</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={(e) => {
-                  e.preventDefault();
-                  setIsLogoutDialogOpen(true);
-                }}>
+                <DropdownMenuItem onSelect={() => setIsLogoutDialogOpen(true)} className="text-red-500 focus:text-red-500">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>Log Out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -37,10 +37,10 @@ import { cn } from '@/lib/utils';
 import type { UserProfile, WatchlistVisibility } from '@/lib/types';
 
 interface ProfileDialogProps {
-  trigger: ReactNode;
+  children: ReactNode;
 }
 
-export function ProfileDialog({ trigger }: ProfileDialogProps) {
+export function ProfileDialog({ children }: ProfileDialogProps) {
   const [user] = useAuthState(auth);
   const router = useRouter();
   const { toast } = useToast();
@@ -116,16 +116,13 @@ export function ProfileDialog({ trigger }: ProfileDialogProps) {
       setIsDeleteDialogOpen(false);
       setOpen(false);
 
-      // Delete user's data (watchlist, folders, and profile)
+      // Delete user's data (watchlist and profile)
       const batch = writeBatch(db);
       
       const watchlistQuery = query(collection(db, 'watchlist'), where('userId', '==', user.uid));
       const watchlistSnapshot = await getDocs(watchlistQuery);
       watchlistSnapshot.forEach((doc) => batch.delete(doc.ref));
 
-      const foldersQuery = query(collection(db, 'folders'), where('userId', '==', user.uid));
-      const foldersSnapshot = await getDocs(foldersQuery);
-      foldersSnapshot.forEach((doc) => batch.delete(doc.ref));
       
       const userProfileRef = doc(db, 'users', user.uid);
       batch.delete(userProfileRef);
@@ -164,7 +161,7 @@ export function ProfileDialog({ trigger }: ProfileDialogProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>{trigger}</DialogTrigger>
+        <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Your Profile</DialogTitle>
@@ -230,7 +227,7 @@ export function ProfileDialog({ trigger }: ProfileDialogProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action is permanent and cannot be undone. All your data, including your watchlist and folders, will be permanently deleted.
+              This action is permanent and cannot be undone. All your data, including your watchlist, will be permanently deleted.
               <br/><br/>
               To confirm, please type your display name: <span className='font-bold text-foreground'>{profile?.displayName}</span>
             </AlertDialogDescription>

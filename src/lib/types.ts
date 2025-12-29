@@ -11,7 +11,6 @@ export interface WatchlistItem {
   watchedAt: number | null;
   createdAt: number;
   order: number;
-  folderId: string | null;
   isD21: boolean;
   notes?: string;
   rating?: number | null;
@@ -20,13 +19,7 @@ export interface WatchlistItem {
   normalizedTitle?: string;
 }
 
-export interface WatchlistFolder {
-  id: string;
-  name: string;
-  userId: string;
-  order: number;
-  createdAt: number;
-}
+export type WatchlistVisibility = 'public' | 'private';
 
 export interface QuickAddItem {
   key: string;
@@ -39,4 +32,13 @@ export const UserProfileSchema = z.object({
   isPublic: z.boolean(),
 });
 
-export type UserProfile = z.infer<typeof UserProfileSchema>;
+export type UserProfileInput = z.infer<typeof UserProfileSchema>;
+
+export interface UserProfile {
+    uid: string;
+    email: string;
+    displayName: string;
+    photoURL?: string;
+    watchlistVisibility: WatchlistVisibility;
+    createdAt?: number;
+}

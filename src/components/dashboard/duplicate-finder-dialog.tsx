@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, ReactNode } from 'react';
-import { Search, Loader2, Trash2, Film, Tv } from 'lucide-react';
+import { Search, Loader2, Trash2, Film, Tv, AlertTriangle } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,9 +23,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+
 import type { WatchlistItem } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, normalizeTitle } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface DuplicateFinderDialogProps {
@@ -39,16 +39,6 @@ type DuplicateGroup = {
   items: WatchlistItem[];
 };
 
-const normalizeTitleForDuplicateCheck = (title: string): string => {
-  return title
-    .toLowerCase()
-    .replace(/\s*\(.*\)\s*|\s*\[.*\]\s*/g, '') 
-    .replace(/&/g, 'and')
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\b(the|a|an)\b/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
 
 export function DuplicateFinderDialog({
   allItems,
@@ -67,7 +57,7 @@ export function DuplicateFinderDialog({
 
     const itemsWithNormalizedTitle = allItems.map(item => ({
       ...item,
-      normalizedTitle: normalizeTitleForDuplicateCheck(item.title),
+      normalizedTitle: normalizeTitle(item.title),
     }));
 
     const titleGroups = itemsWithNormalizedTitle.reduce((acc, item) => {
@@ -182,25 +172,24 @@ export function DuplicateFinderDialog({
                     <h3 className="font-semibold mb-3">"{group.items[0].normalizedTitle}"</h3>
                     <div className="space-y-2">
                       {group.items.map(item => (
-                        <Card key={item.id} className="p-2 sm:p-3">
-                          <CardContent className="p-0 flex items-center justify-between gap-2 sm:gap-4">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate" title={item.title}>{item.title}</p>
+                        <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-4 p-2 sm:p-3 border rounded-md bg-card text-card-foreground shadow-sm w-full">
+                            <div className="min-w-0 overflow-hidden">
+                              <p className="font-medium truncate text-sm sm:text-base" title={item.title}>{item.title}</p>
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
                                 {getStatusBadge(item)}
-                                {item.type === 'movie' ? <Film className='h-4 w-4'/> : <Tv className='h-4 w-4'/>}
+                                {item.type === 'movie' ? <Film className='h-3 w-3'/> : <Tv className='h-3 w-3'/>}
                               </div>
                             </div>
                             <Button
-                              variant="ghost"
+                              variant="destructive"
                               size="icon"
-                              className="text-red-500 hover:text-red-500 hover:bg-red-500/10 h-8 w-8 shrink-0"
+                              className="shrink-0 h-8 w-8 bg-red-600 hover:bg-red-700 text-white rounded-md"
                               onClick={() => setItemToDelete(item)}
+                              title="Delete Item"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </CardContent>
-                        </Card>
+                        </div>
                       ))}
                     </div>
                   </div>

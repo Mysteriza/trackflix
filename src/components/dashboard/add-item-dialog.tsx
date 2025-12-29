@@ -42,7 +42,7 @@ const formSchema = z.object({
 
 
 interface AddItemDialogProps {
-  onAddItem: (item: Omit<WatchlistItem, 'id' | 'order' | 'userId' | 'folderId'>) => void;
+  onAddItem: (item: Omit<WatchlistItem, 'id' | 'order' | 'userId' | 'createdAt' | 'watchedAt' | 'normalizedTitle'>) => void;
   children?: ReactNode;
 }
 

@@ -10,9 +10,13 @@ export const chunk = <T,>(arr: T[], size: number): T[][] =>
     arr.slice(i * size, i * size + size)
   );
 
-export const formatFolderName = (name: string): string => {
-  if (name.startsWith("Watched ")) {
-    return name.substring(8);
-  }
-  return name;
+export const normalizeTitle = (title: string): string => {
+  return title
+    .toLowerCase()
+    .replace(/\s*\(.*\)\s*|\s*\[.*\]\s*/g, '') 
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\b(the|a|an)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
