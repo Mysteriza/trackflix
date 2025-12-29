@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 
 import type { WatchlistItem } from '@/lib/types';
 import { cn, normalizeTitle } from '@/lib/utils';
@@ -48,8 +49,63 @@ export function DuplicateFinderDialog({
   const [open, setOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [itemToDelete, setItemToDelete] = useState<WatchlistItem | null>(null);
   const { toast } = useToast();
+
+  const handleToggleSelect = (id: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(id);
+    } else {
+      newSelected.delete(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const idsToDelete = new Set<string>();
+      duplicates.forEach(group => {
+        // Keep the first item (best candidate), select the rest for deletion
+        group.items.slice(1).forEach(item => idsToDelete.add(item.id));
+      });
+      setSelectedIds(idsToDelete);
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.size === 0) return;
+
+    selectedIds.forEach(id => onDeleteItem(id));
+      
+    setDuplicates(prevDuplicates => {
+      const newDuplicates = prevDuplicates.map(group => {
+           const newItems = group.items.filter(item => !selectedIds.has(item.id));
+           // If only 1 item remains, the duplicate set is resolved. Return null to filter it out.
+           if (newItems.length < 2) {
+               return null;
+           }
+           return { ...group, items: newItems };
+      }).filter((group): group is DuplicateGroup => group !== null);
+
+      if (prevDuplicates.length > 0 && newDuplicates.length === 0) {
+          toast({
+              title: "All Duplicates Resolved!",
+              description: "Your watchlist is now free of duplicates.",
+          });
+      }
+      return newDuplicates;
+    });
+
+    setSelectedIds(new Set());
+    toast({
+        title: "Items Deleted",
+        description: `Successfully deleted ${selectedIds.size} items.`,
+    });
+  };
 
   const findDuplicates = () => {
     setIsSearching(true);
@@ -72,7 +128,14 @@ export function DuplicateFinderDialog({
       .filter(group => group.length > 1)
       .map(group => ({
         title: group[0].title,
-        items: group.sort((a, b) => (a.watched ? 1 : -1)),
+        items: group.sort((a, b) => {
+            // Prioritize Watched items first (keep them safe at index 0)
+            if (a.watched !== b.watched) return a.watched ? -1 : 1;
+            // Then prioritize items with more metadata (e.g. rating)
+            if ((a.rating || 0) !== (b.rating || 0)) return (b.rating || 0) - (a.rating || 0);
+             // Finally sort by created date (keep oldest? or newest? Keep oldest usually original)
+            return a.createdAt - b.createdAt;
+        }),
       }));
 
     setTimeout(() => {
@@ -158,12 +221,37 @@ export function DuplicateFinderDialog({
             </div>
           )}
 
+          {!isSearching && duplicates.length > 0 && (
+             <div className="flex items-center justify-between mb-4 border-b pb-4 px-2">
+                <div className="flex items-center space-x-2">
+                    <Checkbox 
+                        id="select-all" 
+                        checked={duplicates.length > 0 && selectedIds.size === duplicates.reduce((acc, g) => acc + g.items.length, 0)}
+                        onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                    />
+                    <label 
+                        htmlFor="select-all" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                        Select All
+                    </label>
+                </div>
+                {selectedIds.size > 0 && (
+                    <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Selected ({selectedIds.size})
+                    </Button>
+                )}
+             </div>
+          )}
+
           {isSearching && (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           )}
 
+          
           {!isSearching && duplicates.length > 0 && (
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="space-y-4">
@@ -172,7 +260,12 @@ export function DuplicateFinderDialog({
                     <h3 className="font-semibold mb-3">"{group.items[0].normalizedTitle}"</h3>
                     <div className="space-y-2">
                       {group.items.map(item => (
-                        <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-4 p-2 sm:p-3 border rounded-md bg-card text-card-foreground shadow-sm w-full">
+                        <div key={item.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-4 p-2 sm:p-3 border rounded-md bg-card text-card-foreground shadow-sm w-full">
+                             <Checkbox 
+                                id={`select-${item.id}`}
+                                checked={selectedIds.has(item.id)}
+                                onCheckedChange={(checked) => handleToggleSelect(item.id, checked as boolean)}
+                             />
                             <div className="min-w-0 overflow-hidden">
                               <p className="font-medium truncate text-sm sm:text-base" title={item.title}>{item.title}</p>
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
